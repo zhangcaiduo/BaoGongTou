@@ -176,8 +176,8 @@ show_main_menu() {
 "
 
     echo -e "${GREEN}============ VPS 从毛坯房开始装修VPS 包工头面板 v6.9.0 ============================================${NC}"
-    echo -e "${BLUE}本脚本适用于 Ubuntu 和 Debian 系统的项目部署 ${NC}"
-    echo -e "${BLUE}本脚本由小白出于学习与爱好制作，欢迎交流 ${NC}"
+    echo -e "${BLUE}本脚本适用于 Ubuntu 和 Debian 系统的 VPS 常用项目部署 ${NC}"
+    echo -e "${BLUE}本脚本由小白張財多出于学习与爱好制作，欢迎交流 ${NC}"
     echo -e "${BLUE}本脚本不具任何商业盈利，纯属学习不承担任何法律后果 ${NC}"
     echo -e "${BLUE}如果您退出了装修面板，输入 zhangcaiduo 可再次调出 ${NC}"
     echo -e "${BLUE}=========================================================================================${NC}"
@@ -191,6 +191,7 @@ show_main_menu() {
     check_and_display "1" "部署网络水电总管 (NPM)" "/root/npm_data" "docker:npm_app:81"
     echo -e "      ${YELLOW}首次登陆 NPM 请用你的IP地址加:端口81，默认用户: admin@example.com 密码: changeme${NC}"
     echo -e "      ${YELLOW}首次登陆 NPM 后请立即修改初始用户名和密码后再进行配置！${NC}"
+    echo -e "      ${YELLOW}关于配置 NPM 的知识，可以观看我的博客，共同学习！${NC}"
     echo ""
     echo ""
     check_and_display "2" "部署 Nextcloud 家庭数据中心" "/root/nextcloud_data" "docker_nopm:nextcloud_app"
