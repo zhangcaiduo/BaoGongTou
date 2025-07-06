@@ -16,7 +16,7 @@
 
 这个脚本就是我这个“包工头”，带着大家一起，把咱们的“毛坯房”VPS，装修成一个温馨、强大、功能齐全的家。希望它能帮助你节省时间，点燃你对技术的兴趣，让你也能享受到“拥有”一台全功能服务器的乐趣！
 
-*（我只是程序小白，最初什么是SSH工具都不知道，希望我的踩坑能帮助到小白朋友们，大神们请指点，勿喷！感谢！）*
+*（我只是程序小白，像大多数朋友一样最初什么是SSH工具都不知道，希望我的踩坑能帮助到小白朋友们，大神们请指点，勿喷！感谢！）*
 
 ---
 
@@ -25,7 +25,7 @@
 用SSH登录到你的VPS后，只需复制并执行下面这一行命令，即可召唤“包工头面板”：
 
 ```bash
-wget -O vps_installer.sh '[https://raw.githubusercontent.com/zhangcaiduo/vps-installer-script/main/vps_installer.sh](https://raw.githubusercontent.com/zhangcaiduo/vps-installer-script/main/vps_installer.sh)' && sudo bash vps_installer.sh
+wget -O zhangcaiduo.sh '[https://raw.githubusercontent.com/zhangcaiduo/BaoGongTou/main/vps_installer.sh](https://raw.githubusercontent.com/zhangcaiduo/BaoGongTou/main/vps_installer.sh)' && sudo bash zhangcaiduo.sh
 ```
 
 **友情提示**:
