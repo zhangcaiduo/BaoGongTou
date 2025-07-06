@@ -68,6 +68,6 @@ wget -O vps_installer.sh 'https://raw.githubusercontent.com/zhangcaiduo/BaoGongT
 
 **[点我前往项目主页提问或交流](https://github.com/zhangcaiduo/vps-installer-script/issues)**
 
-**[我的博客是：zhangcaiduo.com)**
+**我的博客是：[zhangcaiduo.com](https://zhangcaiduo.com/)**
 
 **感谢每一位使用和支持本脚本的朋友！**
