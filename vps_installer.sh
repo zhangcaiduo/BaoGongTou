@@ -212,7 +212,9 @@ show_main_menu() {
     printf "  %-48s\n" "12) 执行 Nextcloud 最终性能优化"
     printf "  %-48s\t%s\n" "13) ${CYAN}进入服务控制中心${NC}" "[ 启停/重启服务 ]"
     printf "  %-48s\t%s\n" "14) ${CYAN}查看密码与数据路径${NC}" "[ 重要凭证 ]"
-    printf "  %-48s\t%s\n" "15) ${RED}打开“科学”工具箱${NC}" "[ Warp, Argo, OpenVPN ]"
+    echo ""
+    echo ""
+    printf "  %-48s\t%s\n" "15) ${RED}打开“科学上网”工具箱${NC}" "[ 为IPV6小鸡添加 Warp IPV4 出口, Argo 隧道节点, OpenVPN配置 ]"
 
     echo -e "  ----------------------------------------------------------------------------------------"
     printf "  %-48s\t%s\n" "99) ${RED}一键辞退包工头${NC}" "${RED}[ 注：此选项将会拆卸本脚本！！！ ]${NC}"
