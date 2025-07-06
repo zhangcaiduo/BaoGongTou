@@ -13,8 +13,7 @@
 STATE_FILE="/root/.vps_setup_credentials" #     用于存储密码的凭证文件
 RCLONE_CONFIG_FILE="/root/.config/rclone/rclone.conf"
 RCLONE_LOG_FILE="/var/log/rclone.log"
-CYAN='\033[0;36m'
-NC='\033[0m'
+
 
 # ---     首次运行自安装快捷命令  ---
 if [[ "$0" != "bash" && "$0" != "sh" ]]; then
