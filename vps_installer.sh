@@ -209,7 +209,7 @@ install_npm() {
 clear
 echo -e "${BLUE}--- “网络水电总管”开始施工！ ---${NC}";
 sleep 2
-echo -e "\n${YELLOW}     🚀     [1/2]     准备系统环境与     Docker...${NC}"
+echo -e "\n${YELLOW}     🚀     [1/3]     准备系统环境与     Docker...${NC}"
 sudo apt-get update
 sudo apt-get install -y ca-certificates curl gnupg
 if ! command -v docker &> /dev/null; then
@@ -219,7 +219,23 @@ sudo systemctl restart docker
 fi
 echo -e "${GREEN}     ✅        系统环境与     Docker     已就绪！    ${NC}"
 
-echo -e "\n${YELLOW}     🚀     [2/2]     部署     NPM     并创建专属网络总线    ...${NC}"
+echo -e "\n${YELLOW}     🚀     [2/3]     检查并安装核心工具     Docker-Compose...${NC}"
+# --- 新增：检查并安装 Docker Compose ---
+if ! command -v docker-compose &> /dev/null; then
+    echo -e "\n${YELLOW}检测到系统缺少 docker-compose 工具，正在为您自动安装...${NC}"
+    sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+    sudo chmod +x /usr/local/bin/docker-compose
+    if ! command -v docker-compose &> /dev/null; then
+        echo -e "${RED}错误：docker-compose 自动安装失败，请检查网络或手动安装后重试。${NC}"
+        sleep 5
+        return 1
+    else
+        echo -e "${GREEN}✅ docker-compose 安装成功！${NC}"
+    fi
+    sleep 2
+fi
+
+echo -e "\n${YELLOW}     🚀     [3/3]     部署     NPM     并创建专属网络总线    ...${NC}"
 sudo docker network create npm_data_default || true
 mkdir -p /root/npm_data
 cat > /root/npm_data/docker-compose.yml <<'EOF'
