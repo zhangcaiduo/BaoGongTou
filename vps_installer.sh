@@ -1,11 +1,9 @@
 #!/bin/bash
 #================================================================
-# “    VPS 从零开始装修面板    ” v6.7.0 -    交互优化 & 功能增强版
-#    1.   全面对齐主菜单，视觉更统一。
-#    2.   重写“一键还原毛坯”功能，实现无残留彻底清除。
-#    3.   重构选项 6 和 7 的安装逻辑，改为逐项选择、按需安装，交互更友好。
-#    4.   新增“虚拟内存”管理功能，为低配VPS提供性能优化选项。
-#    5.   统一所有部署命令，确保兼容性。
+# “    VPS 从零开始装修面板    ” v6.8.0 -    终极对齐 & 还原版
+#    1.   重写菜单输出逻辑，实现中英文环境下的完美对齐。
+#    2.   重构“一键还原毛坯”功能，增加系统级Web服务器检测与清理，并实现脚本自毁。
+#    3.   优化交互与提示文案。
 #     作者     : 張財多 zhangcaiduo.com
 #================================================================
 
@@ -69,7 +67,6 @@ run_unminimize() {
     echo -e "\n${GREEN} 按任意键返回主菜单 ...${NC}"; read -n 1 -s
 }
 
-# ---     新增：Swap管理功能     ---
 manage_swap() {
     clear
     echo -e "${BLUE}---  配置虚拟内存 (Swap) ---${NC}"
@@ -113,74 +110,83 @@ manage_swap() {
 }
 
 
-# ---     检查函数  ---
+# ---     检查与菜单显示函数 (对齐重构) ---
+# 计算字符串的可视宽度 (一个汉字计为2，一个ASCII字符计为1)
+get_display_width() {
+    local str="$1"
+    local len=$(echo -n "$str" | wc -m)
+    local non_ascii_len=$(echo -n "$str" | sed 's/[ -~]//g' | wc -m)
+    echo $((len + non_ascii_len))
+}
+
+# 打印带状态的菜单项，并确保对齐
+print_menu_item() {
+    local option_text="$1"
+    local status_text="$2"
+    local total_width=52 # 设定一个基准总宽度
+    local option_width=$(get_display_width "$option_text")
+    
+    local padding_width=$((total_width - option_width))
+    if [ $padding_width -lt 1 ]; then
+        padding_width=1
+    fi
+    
+    local padding=$(printf '%*s' "$padding_width" '')
+    
+    printf "  %s%s%s\n" "$option_text" "$padding" "$status_text"
+}
+
 check_and_display() {
     local option_num="$1"
     local text="$2"
     local check_path="$3"
     local status_info="$4"
     local display_text="${option_num}) ${text}"
-    local status_string=""
+    local status_string="[ ❌  未安装 ]"
 
+    # 特殊路径检查逻辑
     if [[ "$status_info" == "downloader" ]]; then
-        if [ ! -d "/root/qbittorrent_data" ] && [ ! -d "/root/jdownloader_data" ] && [ ! -d "/root/ytdlp_data" ]; then
-            check_path=""
-        else
-            check_path="/root/qbittorrent_data"
-        fi
+        check_path=$([ -d "/root/qbittorrent_data" ] || [ -d "/root/jdownloader_data" ] || [ -d "/root/ytdlp_data" ] && echo "/root/dummy_path" || echo "")
     fi
-    
     if [[ "$status_info" == "support_fleet" ]]; then
-        if [ ! -d "/root/alist_data" ] && [ ! -d "/root/gitea_data" ] && [ ! -d "/root/memos_data" ] && [ ! -d "/root/navidrome_data" ]; then
-            check_path=""
-        else
-            check_path="/root/alist_data"
-        fi
+        check_path=$([ -d "/root/alist_data" ] || [ -d "/root/gitea_data" ] || [ -d "/root/memos_data" ] || [ -d "/root/navidrome_data" ] && echo "/root/dummy_path" || echo "")
     fi
 
-    if [ ! -e "$check_path" ]; then
-        status_string="[ ❌  未安装 ]"
-    else
+    if [ -e "$check_path" ]; then
         local type=$(echo "$status_info" | cut -d':' -f1)
         local details=$(echo "$status_info" | cut -d':' -f2-)
         local formatted_details=""
         case "$type" in
             docker)
-                local container_name=$(echo "$details" | cut -d':' -f1)
-                local port=$(echo "$details" | cut -d':' -f2)
-                formatted_details=" 容器 : ${container_name},  管理端口 : ${port}"
+                local container_name=$(echo "$details" | cut -d':' -f1); local port=$(echo "$details" | cut -d':' -f2)
+                formatted_details=" 容器:${container_name}, 端口:${port}"
                 ;;
-            docker_nopm) formatted_details=" 容器 : ${details} ( 已接入总线 )";;
-            multi_docker) formatted_details="${details}";;
+            docker_nopm) formatted_details=" 容器:${details} (已接入总线)";;
             downloader)
                 local tools=""
-                [ -d "/root/qbittorrent_data" ] && tools+="qBittorrent "
-                [ -d "/root/jdownloader_data" ] && tools+="JDownloader "
-                [ -d "/root/ytdlp_data" ] && tools+="yt-dlp"
-                formatted_details=" 已装 : $(echo "$tools" | sed 's/ *$//g' | sed 's/ /, /g')"
+                [ -d "/root/qbittorrent_data" ] && tools+="qBittorrent,"
+                [ -d "/root/jdownloader_data" ] && tools+="JDownloader,"
+                [ -d "/root/ytdlp_data" ] && tools+="yt-dlp,"
+                formatted_details=" 已装: $(echo "$tools" | sed 's/,$//g')"
                 ;;
             support_fleet)
                 local tools=""
-                [ -d "/root/alist_data" ] && tools+="Alist "
-                [ -d "/root/gitea_data" ] && tools+="Gitea "
-                [ -d "/root/memos_data" ] && tools+="Memos "
-                [ -d "/root/navidrome_data" ] && tools+="Navidrome"
-                formatted_details=" 已装 : $(echo "$tools" | sed 's/ *$//g' | sed 's/ /, /g')"
+                [ -d "/root/alist_data" ] && tools+="Alist,"
+                [ -d "/root/gitea_data" ] && tools+="Gitea,"
+                [ -d "/root/memos_data" ] && tools+="Memos,"
+                [ -d "/root/navidrome_data" ] && tools+="Navidrome,"
+                formatted_details=" 已装: $(echo "$tools" | sed 's/,$//g')"
                 ;;
             system) formatted_details=" 系统服务 ";;
-            system_port) formatted_details=" 服务端口 : ${details}";;
-            rclone)
-                formatted_details=" 已配置 "
-                display_text="${GREEN}${option_num}) ${text}${NC}"
-                ;;
+            system_port) formatted_details=" 服务端口: ${details}";;
+            rclone) formatted_details=" 已配置 "; display_text="${GREEN}${option_num}) ${text}${NC}";;
             *) formatted_details=" 已安装 ";;
         esac
         status_string="[ ✅ ${formatted_details}]"
     fi
-    printf "  %-55s %s\n" "${display_text}" "${status_string}"
+    print_menu_item "$display_text" "$status_string"
 }
 
-# ---     菜单函数 ---
 show_main_menu() {
     clear
     echo -e "
@@ -193,7 +199,7 @@ show_main_menu() {
                                            zhangcaiduo.com
 "
 
-    echo -e "${GREEN}============ VPS 从毛坯房开始装修VPS 包工头面板 v6.7.0 ============================================${NC}"
+    echo -e "${GREEN}============ VPS 从毛坯房开始装修VPS 包工头面板 v6.8.0 ============================================${NC}"
     echo -e "${BLUE}本脚本适用于 Ubuntu 和 Debian 系统的项目部署 ${NC}"
     echo -e "${BLUE}本脚本由小白出于学习与爱好制作，欢迎交流 ${NC}"
     echo -e "${BLUE}本脚本不具任何商业盈利，纯属学习不承担任何法律后果 ${NC}"
@@ -201,36 +207,35 @@ show_main_menu() {
     echo -e "${BLUE}=========================================================================================${NC}"
 
     echo -e "  ${GREEN}---  地基与系统  ---${NC}"
-    printf "  %-55s %s\n" "u)  更新系统与软件" "[ apt update && upgrade ]"
-    printf "  %-55s %s\n" "m)  恢复至标准系统" "[ unminimize, 仅限 Ubuntu 系统 ]"
-    printf "  %-55s %s\n" "s)  配置虚拟内存 (Swap)" "[ 增强低配VPS性能 ]"
-
+    print_menu_item "u)  更新系统与软件" "[ apt update && upgrade ]"
+    print_menu_item "m)  恢复至标准系统" "[ unminimize, 仅限 Ubuntu 系统 ]"
+    print_menu_item "s)  配置虚拟内存 (Swap)" "[ 增强低配VPS性能 ]"
 
     echo -e "  ${GREEN}---  主体装修选项  ---${NC}"
-    check_and_display "1" " 部署网络水电总管 (NPM)" "/root/npm_data" "docker:npm_app:81"
-    check_and_display "2" " 部署 Nextcloud 家庭数据中心" "/root/nextcloud_data" "docker_nopm:nextcloud_app"
-    check_and_display "3" " 部署 WordPress 个人博客" "/root/wordpress_data" "docker_nopm:wordpress_app"
-    check_and_display "4" " 部署 Jellyfin 家庭影院" "/root/jellyfin_data" "docker:jellyfin_app:8096"
-    check_and_display "5" " 部署 AI 大脑 (Ollama+WebUI)" "/root/ai_stack" "docker_nopm:open_webui_app"
-    check_and_display "6" " 部署家装工具箱 (Alist,Gitea,memos...)" "/root/alist_data" "support_fleet"
-    check_and_display "7" " 部署下载工具集 (qBittorrent,JDownloader...)" "/root/qbittorrent_data" "downloader"
+    check_and_display "1" "部署网络水电总管 (NPM)" "/root/npm_data" "docker:npm_app:81"
+    check_and_display "2" "部署 Nextcloud 家庭数据中心" "/root/nextcloud_data" "docker_nopm:nextcloud_app"
+    check_and_display "3" "部署 WordPress 个人博客" "/root/wordpress_data" "docker_nopm:wordpress_app"
+    check_and_display "4" "部署 Jellyfin 家庭影院" "/root/jellyfin_data" "docker:jellyfin_app:8096"
+    check_and_display "5" "部署 AI 大脑 (Ollama+WebUI)" "/root/ai_stack" "docker_nopm:open_webui_app"
+    check_and_display "6" "部署家装工具箱 (Alist,Gitea...)" "/root/alist_data" "support_fleet"
+    check_and_display "7" "部署下载工具集 (qBittorrent...)" "/root/qbittorrent_data" "downloader"
 
     echo -e "  ${GREEN}---  安防与工具  ---${NC}"
-    check_and_display "8" " 部署全屋安防系统 (Fail2ban)" "/etc/fail2ban/jail.local" "system"
-    check_and_display "9" " 部署远程工作台 (Xfce)" "/etc/xrdp/xrdp.ini" "system_port:3389"
-    check_and_display "10" " 部署邮件管家 (自动报告)" "/etc/msmtprc" "system"
-    check_and_display "16" " 配置 Rclone 数据同步桥" "${RCLONE_CONFIG_FILE}" "rclone"
+    check_and_display "8" "部署全屋安防系统 (Fail2ban)" "/etc/fail2ban/jail.local" "system"
+    check_and_display "9" "部署远程工作台 (Xfce)" "/etc/xrdp/xrdp.ini" "system_port:3389"
+    check_and_display "10" "部署邮件管家 (自动报告)" "/etc/msmtprc" "system"
+    check_and_display "16" "配置 Rclone 数据同步桥" "${RCLONE_CONFIG_FILE}" "rclone"
 
     echo -e "  ${GREEN}---  高级功能与维护  ---${NC}"
-    printf "  %-55s\n" "11) 为 AI 大脑安装知识库 (安装模型)"
-    printf "  %-55s\n" "12) 执行 Nextcloud 最终性能优化"
-    printf "  %-55s %s\n" "13) ${CYAN}进入服务控制中心${NC}" "[ 启停/重启服务 ]"
-    printf "  %-55s %s\n" "14) ${CYAN}查看密码与数据路径${NC}" "[ 重要凭证 ]"
-    printf "  %-55s %s\n" "15) ${RED}打开“科学”工具箱${NC}" "[ Warp, Argo, OpenVPN ]"
+    print_menu_item "11) 为 AI 大脑安装知识库 (安装模型)" ""
+    print_menu_item "12) 执行 Nextcloud 最终性能优化" ""
+    print_menu_item "13) ${CYAN}进入服务控制中心${NC}" "[ 启停/重启服务 ]"
+    print_menu_item "14) ${CYAN}查看密码与数据路径${NC}" "[ 重要凭证 ]"
+    print_menu_item "15) ${RED}打开“科学”工具箱${NC}" "[ Warp, Argo, OpenVPN ]"
 
     echo -e "  ----------------------------------------------------------------------------------------"
-    printf "  %-55s %s\n" "99) ${RED}一键还原毛坯${NC}" "[ 卸载所有服务 ]"
-    printf "  %-55s %s\n" "q)  退出面板" ""
+    print_menu_item "99) ${RED}一键还原毛坯${NC}" "${RED}[ 注：此选项将会卸载所有服务回到清水房！！！ ]${NC}"
+    print_menu_item "q)  退出面板" ""
     echo -e "${GREEN}===================================================================================================${NC}"
 }
 
@@ -1268,29 +1273,29 @@ EOF
 }
 
 
-# 99.     一键还原毛坯 (功能重写)
+# 99.     一键还原毛坯 (终极重构版)
 uninstall_everything() {
     clear
-    echo -e "${RED}====================     【！！！警告！！！】     ====================${NC}"
-    echo -e "${YELLOW}    此操作将【不可逆转地】删除此面板安装的所有服务和数据！    ${NC}"
-    echo "    包括所有的 Docker 容器、镜像、数据卷、网络、配置文件和密码记录。"
-    echo -e "${RED}    请在执行前三思，并确保您已备份所有重要数据！    ${NC}"
-    echo -e "----------------------------------------------------------"
-    read -p "    为确认执行此毁灭性操作，请输入【    yEs-i-aM-sUrE    】    : " confirmation
+    echo -e "${RED}====================     【！！！终极警告！！！】     ====================${NC}"
+    echo -e "${YELLOW}    此操作将【不可逆转地】彻底清除本面板安装的所有服务、数据和相关配置！    ${NC}"
+    echo "    这包括 Docker 环境、系统级工具、用户账户、所有配置文件和数据目录。"
+    echo -e "${RED}    此操作将彻底告别張財多的包工头代码，如果需要再次安装，请重装系统避免出岔子。    ${NC}"
+    echo -e "----------------------------------------------------------------------------------"
+    read -p "    为确认执行此终极毁灭操作，请输入【    yEs-i-aM-sUrE    】    : " confirmation
     if [[ "$confirmation" != "yEs-i-aM-sUrE" ]]; then
         echo -e "${GREEN}     操作已取消，您的房子安然无恙。    ${NC}"; sleep 3; return
     fi
 
-    echo -e "\n${RED}     最终确认通过    ...     开始执行全屋拆除程序    ...${NC}";
+    echo -e "\n${RED}     最终确认通过    ...     开始执行终极全屋拆除程序    ...${NC}";
     sleep 3
 
-    echo -e "\n${YELLOW}     🚀     [1/5]     正在进行 Docker 系统级清理 (容器, 镜像, 数据卷, 网络)...${NC}"
+    echo -e "\n${YELLOW}     🚀     [1/6]     正在进行 Docker 系统级清理 (容器, 镜像, 数据卷, 网络)...${NC}"
     if command -v docker &> /dev/null; then
       sudo docker system prune -a --volumes -f
     fi
     echo -e "${GREEN}     ✅     Docker 环境已彻底清理。    ${NC}"
 
-    echo -e "\n${YELLOW}     🚀     [2/5]     正在清理所有服务的数据和配置文件夹    ...${NC}"
+    echo -e "\n${YELLOW}     🚀     [2/6]     正在清理所有服务的数据和配置文件夹    ...${NC}"
     sudo rm -rf /root/npm_data /root/nextcloud_data /root/onlyoffice_data /root/wordpress_data \
         /root/jellyfin_data /root/ai_stack /root/alist_data /root/gitea_data \
         /root/memos_data /root/navidrome_data /root/qbittorrent_data \
@@ -1299,7 +1304,7 @@ uninstall_everything() {
     sudo rm -rf /mnt/*
     echo -e "${GREEN}     ✅     所有数据文件夹已清理。    ${NC}"
 
-    echo -e "\n${YELLOW}     🚀     [3/5]     正在卸载系统级工具和配置    ...${NC}"
+    echo -e "\n${YELLOW}     🚀     [3/6]     正在卸载脚本安装的系统级工具...${NC}"
     # 卸载Rclone服务
     for service in $(ls /etc/systemd/system/rclone-*.service 2>/dev/null); do
         sudo systemctl stop $(basename ${service})
@@ -1309,37 +1314,63 @@ uninstall_everything() {
     sudo systemctl daemon-reload
     # 卸载邮件报告
     (crontab -l 2>/dev/null | grep -v "/usr/local/bin/daily_server_report.sh") | crontab -
-    sudo apt-get purge -y s-nail msmtp vnstat &>/dev/null
-    sudo rm -f /etc/msmtprc /etc/s-nail.rc /usr/local/bin/daily_server_report.sh
-    # 卸载Fail2ban
-    sudo apt-get purge -y fail2ban &>/dev/null
-    sudo rm -f /etc/fail2ban/jail.local
     # 卸载远程桌面和用户
     if [ -f "/etc/xrdp/xrdp.ini" ]; then
-        local desktop_user=$(grep 'DESKTOP_USER' ${STATE_FILE} | cut -d'=' -f2)
-        if [ -n "$desktop_user" ]; then
+        local desktop_user=$(grep 'DESKTOP_USER' ${STATE_FILE} 2>/dev/null | cut -d'=' -f2)
+        if [ -n "$desktop_user" ] && id "$desktop_user" &>/dev/null; then
             echo -e "${YELLOW} 正在删除远程桌面用户: ${desktop_user} ...${NC}"
             sudo deluser --remove-home "$desktop_user" &>/dev/null
         fi
-        sudo apt-get purge -y xrdp xfce4* &>/dev/null
         sudo rm -f /root/.xsession
     fi
-    echo -e "${GREEN}     ✅     系统级工具已卸载。    ${NC}"
+    # 批量卸载
+    sudo apt-get purge -y fail2ban s-nail msmtp vnstat xrdp xfce4* &>/dev/null
+    sudo rm -f /etc/msmtprc /etc/s-nail.rc /usr/local/bin/daily_server_report.sh /etc/fail2ban/jail.local
+    echo -e "${GREEN}     ✅     脚本安装的系统级工具已卸载。    ${NC}"
 
-    echo -e "\n${YELLOW}     🚀     [4/5]     正在销毁凭证保险箱和日志...${NC}"
+    echo -e "\n${YELLOW}     🚀     [4/6]     正在检查并可选卸载系统级Web服务器...${NC}"
+    if command -v nginx &> /dev/null; then
+        read -p "检测到系统范围的 Nginx，这并非本脚本安装。是否彻底卸载它及其配置? (y/n): " uninstall_nginx
+        if [[ "$uninstall_nginx" == "y" || "$uninstall_nginx" == "Y" ]]; then
+            sudo systemctl stop nginx
+            sudo apt-get purge -y nginx nginx-common
+            sudo rm -rf /etc/nginx
+            echo -e "${GREEN} ✅ 系统 Nginx 已卸载。${NC}"
+        fi
+    fi
+    if command -v apache2 &> /dev/null; then
+        read -p "检测到系统范围的 Apache2，这并非本脚本安装。是否彻底卸载它及其配置? (y/n): " uninstall_apache
+        if [[ "$uninstall_apache" == "y" || "$uninstall_apache" == "Y" ]]; then
+            sudo systemctl stop apache2
+            sudo apt-get purge -y apache2 apache2-utils
+            sudo rm -rf /etc/apache2
+            echo -e "${GREEN} ✅ 系统 Apache2 已卸载。${NC}"
+        fi
+    fi
+    echo -e "${YELLOW}正在清理无用依赖...${NC}"
+    sudo apt-get autoremove -y &>/dev/null
+    echo -e "${GREEN}     ✅     系统环境清理完毕。    ${NC}"
+
+
+    echo -e "\n${YELLOW}     🚀     [5/6]     正在销毁凭证保险箱和日志...${NC}"
     sudo rm -f ${STATE_FILE} ${RCLONE_LOG_FILE}
     echo -e "${GREEN}     ✅     凭证保险箱已销毁。    ${NC}"
     
-    echo -e "\n${YELLOW}     🚀     [5/5]     正在移除脚本快捷方式...${NC}"
+    echo -e "\n${YELLOW}     🚀     [6/6]     正在执行最终清理... 过河拆桥...${NC}"
     sudo rm -f /usr/local/bin/zhangcaiduo
     echo -e "${GREEN}     ✅     快捷方式已移除。    ${NC}"
+    
+    echo -e "\n${GREEN}====================     ✅        终极还原完成        ✅     ====================${NC}"
+    echo "    所有相关服务和数据已被清除。您的服务器已最大程度恢复纯净。"
+    echo -e "${RED}    强烈建议您【重启服务器】以确保所有变更生效。如果想再次使用本面板，最好【重装操作系统】。${NC}"
+    
+    # 脚本自毁
+    rm -- "$0"
 
-    echo -e "\n${GREEN}====================     ✅        还原毛坯完成        ✅     ====================${NC}"
-    echo "    所有相关服务和数据已被清除。您的服务器已恢复纯净。    "
-    echo "    您可以重新开始装修您的新家了！    "
-    echo -e "\n${GREEN}    按任意键退出面板    ...${NC}"; read -n 1 -s
+    echo -e "\n${GREEN}    按任意键退出...${NC}"; read -n 1 -s
     exit 0
 }
+
 
 # ---     主循环     ---
 while true; do
