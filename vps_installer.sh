@@ -359,6 +359,7 @@ echo -e "\n${GREEN}    所有后台任务已完成，按任意键返回主菜单
 }
 
 # 3. WordPress
+# 这是【正确版】新代码，请复制粘贴
 install_wordpress() {
 check_npm_installed || return
 read -p "    请输入您的     WordPress     主域名     (    例如     zhangcaiduo.com): " WP_DOMAIN
@@ -372,40 +373,44 @@ clear
 echo -e "${BLUE}--- “WordPress 个人博客”建造计划启动！ ---${NC}";
 sleep 2
 mkdir -p /root/wordpress_data
+# 修正了 docker-compose.yml 的内容，保证正确的 YAML 格式
 cat > /root/wordpress_data/docker-compose.yml <<EOF
+version: '3'
 services:
-db:
-image: mariadb:11.4
-container_name: wordpress_db
-restart: unless-stopped
-volumes:
-- './db_data:/var/lib/mysql'
-environment:
-MYSQL_ROOT_PASSWORD: ${WP_DB_ROOT_PASS}
-MYSQL_DATABASE: wordpress
-MYSQL_USER: wordpress
-MYSQL_PASSWORD: ${WP_DB_PASS}
+  db:
+    image: mariadb:11.4
+    container_name: wordpress_db
+    restart: unless-stopped
+    volumes:
+      - './db_data:/var/lib/mysql'
+    environment:
+      MYSQL_ROOT_PASSWORD: ${WP_DB_ROOT_PASS}
+      MYSQL_DATABASE: wordpress
+      MYSQL_USER: wordpress
+      MYSQL_PASSWORD: ${WP_DB_PASS}
+    networks:
+      - npm_network
+
+  wordpress:
+    image: wordpress:latest
+    container_name: wordpress_app
+    restart: unless-stopped
+    volumes:
+      - './html:/var/www/html'
+    environment:
+      WORDPRESS_DB_HOST: wordpress_db
+      WORDPRESS_DB_USER: wordpress
+      WORDPRESS_DB_PASSWORD: ${WP_DB_PASS}
+      WORDPRESS_DB_NAME: wordpress
+    depends_on:
+      - db
+    networks:
+      - npm_network
+
 networks:
-- npm_network
-wordpress:
-image: wordpress:latest
-container_name: wordpress_app
-restart: unless-stopped
-volumes:
-- './html:/var/www/html'
-environment:
-WORDPRESS_DB_HOST: wordpress_db
-WORDPRESS_DB_USER: wordpress
-WORDPRESS_DB_PASSWORD: ${WP_DB_PASS}
-WORDPRESS_DB_NAME: wordpress
-depends_on:
-- db
-networks:
-- npm_network
-networks:
-npm_network:
-name: npm_data_default
-external: true
+  npm_network:
+    name: npm_data_default
+    external: true
 EOF
 (cd /root/wordpress_data && sudo docker-compose up -d)
 echo -e "${GREEN}     ✅     WordPress     已在后台启动！    ${NC}"
@@ -415,39 +420,6 @@ echo "WORDPRESS_DOMAIN=${WP_DOMAIN}" >> ${STATE_FILE}
 
 echo -e "\n${GREEN}===============     ✅     WordPress     部署完成        ✅     ===============${NC}"
 echo "    请在     NPM     中为     ${BLUE}${WP_DOMAIN}${NC} (    以及     www.${WP_DOMAIN})     配置代理，指向     ${BLUE}wordpress_app:80${NC}"
-echo -e "\n${GREEN}    按任意键返回主菜单    ...${NC}"; read -n 1 -s
-}
-
-# 4. Jellyfin
-install_jellyfin() {
-check_npm_installed || return
-clear
-echo -e "${BLUE}--- “Jellyfin 家庭影院”建造计划启动！ ---${NC}";
-sleep 2
-mkdir -p /root/jellyfin_data/config /mnt/Movies /mnt/TVShows /mnt/Music
-cat > /root/jellyfin_data/docker-compose.yml <<'EOF'
-services:
-jellyfin:
-image: jellyfin/jellyfin:latest
-container_name: jellyfin_app
-restart: unless-stopped
-volumes:
-- './config:/config'
-- '/mnt/Movies:/media/movies'
-- '/mnt/TVShows:/media/tvshows'
-- '/mnt/Music:/media/music'
-networks:
-- npm_network
-networks:
-npm_network:
-name: npm_data_default
-external: true
-EOF
-(cd /root/jellyfin_data && sudo docker-compose up -d)
-echo -e "${GREEN}     ✅     Jellyfin     已在后台启动！    ${NC}"
-echo -e "\n${GREEN}===============     ✅     Jellyfin     部署完成        ✅     ===============${NC}"
-echo "    请在     NPM     中为您规划的域名配置代理，指向     ${BLUE}jellyfin_app:8096${NC}"
-echo "    媒体库目录已创建    : /mnt/Movies, /mnt/TVShows, /mnt/Music"
 echo -e "\n${GREEN}    按任意键返回主菜单    ...${NC}"; read -n 1 -s
 }
 
