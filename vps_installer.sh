@@ -1381,7 +1381,7 @@ while true; do
         15) install_science_tools ;;
         16) configure_rclone_engine ;;
         99) uninstall_everything ;;
-        q|Q) echo -e "${BLUE}    装修愉快，工头再见！    ${NC}"; exit 0 ;;
+        q|Q) echo -e "${BLUE}    装修愉快，房主再见！    ${NC}"; exit 0 ;;
         *) echo -e "${RED}    无效的选项，请重新输入。    ${NC}"; sleep 2 ;;
     esac
 done
