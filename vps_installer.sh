@@ -189,7 +189,9 @@ show_main_menu() {
 
     echo -e "  ${GREEN}---  主体装修选项  ---${NC}"
     check_and_display "1" "部署网络水电总管 (NPM)" "/root/npm_data" "docker:npm_app:81"
-    echo -e "      ${YELLOW}首次登陆NPM请用你的IP地址加:端口81，默认用户: admin@example.com 密码: changeme${NC}"
+    echo -e "      ${YELLOW}首次登陆 NPM 请用你的IP地址加:端口81，默认用户: admin@example.com 密码: changeme${NC}"
+    echo -e "      ${YELLOW}首次登陆 NPM 后请立即修改初始用户名和密码后再进行配置！${NC}"
+    echo ""
     echo ""
     check_and_display "2" "部署 Nextcloud 家庭数据中心" "/root/nextcloud_data" "docker_nopm:nextcloud_app"
     check_and_display "3" "部署 WordPress 个人博客" "/root/wordpress_data" "docker_nopm:wordpress_app"
