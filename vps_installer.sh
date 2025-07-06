@@ -1,9 +1,9 @@
 #!/bin/bash
 #================================================================
-# “    VPS 从零开始装修面板    ” v7.1.0 -    健壮性与环境检查修复版
-#    1.   新增全局 Docker 环境检查函数，确保任何应用部署前 Docker 已就绪。
-#    2.   为所有 docker-compose 命令增加执行结果判断，避免失败后错误报告成功。
-#    3.   移除了 docker-compose 文件中过时的 'version' 标签。
+# “    VPS 从零开始装修面板    ” v7.2.0 -    Rclone 联动增强版
+#    1.   重构 Rclone 功能，实现一次配置、全盘挂载到 /mnt/onedrive，简化操作。
+#    2.   增强服务控制中心，可为 Jellyfin/Navidrome/qBittorrent 等应用动态关联 Rclone 路径。
+#    3.   新增“查看应用目录”与“关联 Rclone”功能，实现本地存储与云端存储的无缝切换。
 #     作者     : 張財多 zhangcaiduo.com
 #================================================================
 
@@ -173,7 +173,14 @@ check_and_display() {
             docker_nopm) formatted_details=" 容器:${details} (已接入总线)";;
             system) formatted_details=" 系统服务 ";;
             system_port) formatted_details=" 服务端口: ${details}";;
-            rclone) formatted_details=" 已配置 "; display_text="${GREEN}${option_num}) ${text}${NC}";;
+            rclone)
+                if grep -q "RCLONE_REMOTE" "${STATE_FILE}"; then
+                    local remote_name=$(grep "RCLONE_REMOTE" "${STATE_FILE}" | cut -d'=' -f2)
+                    formatted_details=" 已配置: ${remote_name} "
+                else
+                    formatted_details=" 已配置 "
+                fi
+                display_text="${GREEN}${option_num}) ${text}${NC}";;
             *) formatted_details=" 已安装 ";;
         esac
         status_string="[ ✅ ${formatted_details}]"
@@ -194,7 +201,7 @@ show_main_menu() {
                                            zhangcaiduo.com
 "
 
-    echo -e "${GREEN}============ VPS 从毛坯房开始装修VPS 包工头面板 v7.1.0 ============================================${NC}"
+    echo -e "${GREEN}============ VPS 从毛坯房开始装修VPS 包工头面板 v7.2.0 ============================================${NC}"
     echo -e "${BLUE}本脚本适用于 Ubuntu 和 Debian 系统的 VPS 常用项目部署 ${NC}"
     echo -e "${BLUE}如果您退出了装修面板，输入 zhangcaiduo 可再次调出 ${NC}"
     echo -e "${BLUE}=========================================================================================${NC}"
@@ -228,12 +235,12 @@ show_main_menu() {
     check_and_display "15" "部署全屋安防系统 (Fail2ban)" "/etc/fail2ban/jail.local" "system"
     check_and_display "16" "部署远程工作台 (Xfce)" "/etc/xrdp/xrdp.ini" "system_port:3389"
     check_and_display "17" "部署邮件管家 (自动报告)" "/etc/msmtprc" "system"
-    check_and_display "18" "配置 Rclone 数据同步桥" "${RCLONE_CONFIG_FILE}" "rclone"
+    check_and_display "18" "配置 Rclone 数据同步桥 (全盘跃迁)" "${RCLONE_CONFIG_FILE}" "rclone"
 
     echo -e "  ${GREEN}---  高级功能与维护  ---${NC}"
     printf "  %-48s\n" "21) 为 AI 大脑安装知识库 (安装模型)"
     printf "  %-48s\n" "22) 执行 Nextcloud 最终性能优化"
-    printf "  %-48s\t%s\n" "23) ${CYAN}进入服务控制中心${NC}" "[ 启停/重启服务 ]"
+    printf "  %-48s\t%s\n" "23) ${CYAN}进入服务控制中心${NC}" "[ 启停/重启/关联Rclone ]"
     printf "  %-48s\t%s\n" "24) ${CYAN}查看密码与数据路径${NC}" "[ 重要凭证 ]"
     printf "  %-48s\t%s\n" "25) ${RED}打开“科学上网”工具箱${NC}" "[ Warp, Argo, OpenVPN ]"
     echo -e "  ----------------------------------------------------------------------------------------"
@@ -939,95 +946,67 @@ EOF
     echo -e "\n${GREEN}    按任意键返回主菜单    ...${NC}"; read -n 1 -s
 }
 
-# 18. Rclone     数据同步桥
+# 18. Rclone 数据同步桥 (v7.2.0 重构)
 configure_rclone_engine() {
     clear
-    echo -e "${BLUE}--- “Rclone 数据同步桥”配置向导 ---${NC}"
+    echo -e "${BLUE}--- “Rclone 数据同步桥”配置向导 (全盘跃迁模式) ---${NC}"
 
+    # 安装 Rclone
     if ! command -v rclone &> /dev/null; then
-        echo -e "\n${YELLOW}     🚀        正在为您安装    Rclone    主程序    ...${NC}"
+        echo -e "\n${YELLOW}     🚀        正在为您安装 Rclone 主程序...${NC}"
         curl https://rclone.org/install.sh | sudo bash
         sudo apt-get install -y fuse3
-        echo -e "${GREEN}     ✅     Rclone    已安装完毕！    ${NC}"
+        echo -e "${GREEN}     ✅     Rclone 已安装完毕！    ${NC}"
         sleep 2
     fi
 
+    # 交互式配置 Rclone
     if [ ! -f "${RCLONE_CONFIG_FILE}" ]; then
-        echo -e "\n${YELLOW}     未检测到    Rclone    配置文件。   ${NC}"
-        echo -e "${CYAN}     即将启动    Rclone    官方交互式配置工具   ...${NC}"
+        echo -e "\n${YELLOW}     未检测到 Rclone 配置文件。${NC}"
+        echo -e "${CYAN}     即将启动 Rclone 官方交互式配置工具...${NC}"
         echo "----------------------------------------------------------"
-        echo -e "     您将进入一个问答式配置流程，请根据提示操作：   "
-        echo -e "  - ${YELLOW}   新建    remote    时，名字建议设为   : onedrive${NC}"
-        echo -e "  - ${YELLOW}   当询问    'Use auto config?' 时，必须选    'n' (no)${NC}"
-        echo -e "  - ${YELLOW}   其他选项请根据您的实际情况选择。   ${NC}"
+        echo -e "     您将进入一个问答式配置流程，请根据提示操作："
+        echo -e "  - ${YELLOW}   新建 remote 时，请记住您为它取的名字 (name)。${NC}"
+        echo -e "  - ${YELLOW}   当询问 'Use auto config?' 时，必须选 'n' (no)。${NC}"
+        echo -e "  - ${YELLOW}   复制浏览器打开的链接完成授权，再将 token 粘贴回来。${NC}"
         echo "----------------------------------------------------------"
-        read -p "     准备好后，请按任意键继续   ..." -n 1 -s
+        read -p "     准备好后，请按任意键继续..." -n 1 -s
         echo -e "\n"
         rclone config
         if [ ! -f "${RCLONE_CONFIG_FILE}" ]; then
-            echo -e "\n${RED}     错误：配置似乎未成功保存。请重新尝试。   ${NC}"
+            echo -e "\n${RED}     错误：配置似乎未成功保存。请重新尝试。${NC}"
             sleep 3
             return
         fi
-        echo -e "\n${GREEN}     ✅        检测到    Rclone    配置文件已成功创建！    ${NC}"
+        echo -e "\n${GREEN}     ✅        检测到 Rclone 配置文件已成功创建！${NC}"
         sleep 2
     fi
 
-    echo -e "\n${GREEN}  Rclone    连接已配置，现在开始设置自动同步文件夹。   ${NC}"
-    sleep 2
+    echo -e "\n${CYAN}--- 设置 Rclone 全盘自动挂载 ---${NC}"
+    
+    # 获取用户配置的 remote 名称
+    read -p "    请输入您在上面配置中设置的 remote 名称 (例如 onedrive): " rclone_remote_name
+    if [ -z "$rclone_remote_name" ]; then
+        echo -e "${RED} remote 名称不能为空，配置中止。${NC}"; sleep 3; return
+    fi
 
-    while true; do
-        clear
-        echo -e "\n${CYAN}---     配置数据同步点 (自动同步文件夹) ---${NC}"
-        echo "    您可以多次选择，为不同的文件夹建立独立的同步通道。    "
-        echo "----------------------------------------------------------"
-        display_rclone_sync_status() {
-            local service_file="/etc/systemd/system/$2.service"
-            local text="$1"
-            if [ -f "$service_file" ]; then
-                echo -e "${GREEN}${text} [ ✅  已配置同步 ]${NC}"
-            else
-                echo -e "${text}"
-            fi
-        }
-        display_rclone_sync_status "  1)     同步     [Music]     文件夹 " "rclone-music"
-        display_rclone_sync_status "  2)     同步     [Movies]     文件夹 " "rclone-movies"
-        display_rclone_sync_status "  3)     同步     [TVShows]    文件夹 " "rclone-tvshows"
-        display_rclone_sync_status "  4)     同步     [Downloads]     文件夹 " "rclone-downloads"
-        echo "  5)     同步自定义文件夹    "
-        echo "----------------------------------------------------------"
-        echo "  b)     完成并返回主菜单    "
-        read -p "    请选择要同步的文件夹    : " mount_choice
+    local rclone_mount_path="/mnt/onedrive"
+    
+    # 保存配置到状态文件，以便其他功能调用
+    sed -i '/^RCLONE_REMOTE/d' ${STATE_FILE}
+    sed -i '/^RCLONE_MOUNT_PATH/d' ${STATE_FILE}
+    echo "RCLONE_REMOTE=${rclone_remote_name}" >> ${STATE_FILE}
+    echo "RCLONE_MOUNT_PATH=${rclone_mount_path}" >> ${STATE_FILE}
 
-        local onedrive_path=""
-        local local_path=""
-        local service_name=""
-
-        case $mount_choice in
-            1) onedrive_path="Music"; local_path="/mnt/Music"; service_name="rclone-music";;
-            2) onedrive_path="Movies"; local_path="/mnt/Movies"; service_name="rclone-movies";;
-            3) onedrive_path="TVShows"; local_path="/mnt/TVShows"; service_name="rclone-tvshows";;
-            4) onedrive_path="Downloads"; local_path="/mnt/Downloads"; service_name="rclone-downloads";;
-            5)
-                read -p "    请输入您     OneDrive     中的文件夹名     (    例如     'MyFiles'): " custom_od_path
-                read -p "    请输入您想在     VPS     上创建的本地路径     (    例如     '/mnt/myfiles'): " custom_local_path
-                if [ -z "$custom_od_path" ] || [ -z "$custom_local_path" ]; then
-                    echo -e "${RED}     文件夹名和路径均不能为空！    ${NC}"; sleep 2; continue
-                fi
-                onedrive_path=$custom_od_path
-                local_path=$custom_local_path
-                sanitized_name=$(echo "$custom_od_path" | tr -d '/')
-                service_name="rclone-$(echo "$sanitized_name" | tr '[:upper:]' '[:lower:]' | tr -d ' ')"
-                ;;
-            b) break;;
-            *) echo -e "${RED}     无效选择    !${NC}"; sleep 2; continue;;
-        esac
-
-        echo -e "\n${YELLOW}     正在为     ${onedrive_path}     创建同步通道    ...${NC}"
-        sudo mkdir -p "${local_path}"
-        sudo tee "/etc/systemd/system/${service_name}.service" > /dev/null <<EOF
+    echo -e "\n${YELLOW}     正在为 ${rclone_remote_name} 创建全盘挂载通道...${NC}"
+    echo -e "${YELLOW}     远程路径: ${rclone_remote_name}:/  ->  本地路径: ${rclone_mount_path}${NC}"
+    
+    sudo mkdir -p "${rclone_mount_path}"
+    
+    # 创建 systemd 服务文件
+    sudo tee "/etc/systemd/system/rclone-vps-mount.service" > /dev/null <<EOF
 [Unit]
-Description=Rclone Mount for OneDrive (${onedrive_path})
+Description=Rclone Mount Service for ${rclone_remote_name}
 Wants=network-online.target
 After=network-online.target
 [Service]
@@ -1036,7 +1015,7 @@ User=root
 Group=root
 RestartSec=10
 Restart=on-failure
-ExecStart=/usr/bin/rclone mount onedrive:${onedrive_path} ${local_path} \\
+ExecStart=/usr/bin/rclone mount ${rclone_remote_name}: ${rclone_mount_path} \\
 --config ${RCLONE_CONFIG_FILE} \\
 --uid 1000 \\
 --gid 1000 \\
@@ -1046,24 +1025,26 @@ ExecStart=/usr/bin/rclone mount onedrive:${onedrive_path} ${local_path} \\
 --vfs-cache-max-size 5G \\
 --log-level INFO \\
 --log-file ${RCLONE_LOG_FILE}
-ExecStop=/bin/fusermount -u ${local_path}
+ExecStop=/bin/fusermount -u ${rclone_mount_path}
 [Install]
 WantedBy=default.target
 EOF
 
-        sudo systemctl daemon-reload
-        sudo systemctl enable --now "${service_name}.service"
-        sleep 2
-        if systemctl is-active --quiet "${service_name}.service"; then
-            echo -e "${GREEN}     ✅        同步通道     ${onedrive_path} -> ${local_path}     已激活！    ${NC}"
-        else
-            echo -e "${RED}     ❌        同步通道启动失败！请检查日志。    ${NC}"
-            echo -e "${YELLOW}     显示最近的     10     行日志     (${RCLONE_LOG_FILE}):${NC}"
-            sudo tail -n 10 ${RCLONE_LOG_FILE}
-        fi
-        sleep 3
-    done
-    echo -e "\n${GREEN}Rclone     数据同步桥配置完成！按任意键返回主菜单    ...${NC}"; read -n 1 -s
+    # 启动并激活服务
+    sudo systemctl daemon-reload
+    sudo systemctl enable --now "rclone-vps-mount.service"
+    sleep 2
+    
+    if systemctl is-active --quiet "rclone-vps-mount.service"; then
+        echo -e "${GREEN}     ✅        Rclone 全盘跃迁通道已激活！${NC}"
+        echo -e "${GREEN}     您的 ${rclone_remote_name} 网盘已完整挂载到 ${rclone_mount_path} ${NC}"
+    else
+        echo -e "${RED}     ❌        挂载通道启动失败！请检查日志。${NC}"
+        echo -e "${YELLOW}     显示最近的 10 行日志 (${RCLONE_LOG_FILE}):${NC}"
+        sudo tail -n 10 ${RCLONE_LOG_FILE}
+    fi
+    
+    echo -e "\n${GREEN}Rclone 数据同步桥配置完成！按任意键返回主菜单...${NC}"; read -n 1 -s
 }
 
 # 21.     安装     AI     知识库
@@ -1133,7 +1114,7 @@ run_nextcloud_optimization() {
     echo -e "\n${GREEN}    按任意键返回主菜单    ...${NC}"; read -n 1 -s
 }
 
-# 23.     服务控制中心
+# 23. 服务控制中心 (v7.2.0 重构)
 show_service_control_panel() {
     ensure_docker_installed || return
     while true; do
@@ -1173,32 +1154,140 @@ show_service_control_panel() {
         if [[ "$service_choice" == "b" || "$service_choice" == "B" ]]; then break; fi
 
         local index=$((service_choice-1))
-        if [[ $index -ge 0 && $index -lt ${#active_services[@]} ]]; then
-            local selected_service=${active_services[$index]}
-            local s_name=$(echo $selected_service | cut -d':' -f1)
-            local s_path=$(echo $selected_service | cut -d':' -f2)
+        if ! [[ $index -ge 0 && $index -lt ${#active_services[@]} ]]; then
+             echo -e "${RED}     无效选择    !${NC}"; sleep 2; continue
+        fi
+        
+        local selected_service=${active_services[$index]}
+        local s_name=$(echo $selected_service | cut -d':' -f1)
+        local s_path=$(echo $selected_service | cut -d':' -f2)
+        local compose_file="${s_path}/docker-compose.yml"
+        
+        # 定义可关联 Rclone 的服务及其属性
+        local is_linkable=false
+        local container_paths=() # 容器内的路径
+        local path_labels=()    # 给用户看的标签
+        local default_local_paths=() # 默认的本地路径
 
-            clear
-            echo "    正在操作服务    : ${CYAN}${s_name}${NC}"
-            echo "1)     启动    "
-            echo "2)     停止    "
-            echo "3)     重启    "
-            echo "4)     查看日志     (    按     Ctrl+C     退出    )"
-            echo "b)     返回    "
-            read -p "    请选择操作    : " action_choice
+        case "$s_name" in
+            "Jellyfin 影院")
+                is_linkable=true
+                container_paths=("/media/music" "/media/movies" "/media/tvshows")
+                path_labels=("音乐库" "电影库" "电视剧库")
+                default_local_paths=("/mnt/Music" "/mnt/Movies" "/mnt/TVShows")
+                ;;
+            "Navidrome 音乐")
+                is_linkable=true
+                container_paths=("/music")
+                path_labels=("音乐库")
+                default_local_paths=("/mnt/Music")
+                ;;
+            "qBittorrent"|"JDownloader"|"yt-dlp 下载")
+                is_linkable=true
+                container_paths=("/downloads" "/output" "/app/downloads") # 这三个容器路径不同但都指向下载目录
+                path_labels=("下载目录")
+                default_local_paths=("/mnt/Downloads")
+                ;;
+        esac
+
+        clear
+        echo "    正在操作服务    : ${CYAN}${s_name}${NC}"
+        
+        if $is_linkable; then
+            echo "1)     启动"
+            echo "2)     停止"
+            echo "3)     重启"
+            echo "4)     查看本项目文件夹地址"
+            echo "5)     将文件夹地址关联到Rclone跃迁的网盘"
+            echo "6)     查看日志 (按 Ctrl+C 退出)"
+            echo "b)     返回"
+            read -p "    请选择操作: " action_choice
 
             case $action_choice in
-                1) (cd $s_path && sudo docker-compose up -d); echo -e "${GREEN}${s_name}     已启动    !${NC}";;
-                2) (cd $s_path && sudo docker-compose stop); echo -e "${YELLOW}${s_name}     已停止    !${NC}";;
-                3) (cd $s_path && sudo docker-compose restart); echo -e "${CYAN}${s_name}     已重启    !${NC}";;
-                4) sudo docker-compose -f ${s_path}/docker-compose.yml logs -f --tail 50;;
+                1) (cd $s_path && sudo docker-compose up -d); echo -e "${GREEN}${s_name} 已启动!${NC}";;
+                2) (cd $s_path && sudo docker-compose stop); echo -e "${YELLOW}${s_name} 已停止!${NC}";;
+                3) (cd $s_path && sudo docker-compose restart); echo -e "${CYAN}${s_name} 已重启!${NC}";;
+                4)  # 查看路径
+                    echo -e "\n${CYAN}--- ${s_name} 当前文件夹地址 ---${NC}"
+                    for i in ${!container_paths[@]}; do
+                        local c_path=${container_paths[$i]}
+                        local label=${path_labels[$i]}
+                        # 查找所有可能的路径定义，适配不同的服务
+                        local line=$(grep -E ":${c_path}['\"]?$" "$compose_file" || grep -E ":/downloads['\"]?$" "$compose_file" || grep -E ":/output['\"]?$" "$compose_file")
+                        if [ -n "$line" ]; then
+                           local host_path=$(echo "$line" | awk -F: '{print $1}' | sed -e 's/^[ \t-]*//' -e "s/['\"]//g")
+                           echo "  - ${label}: ${GREEN}${host_path}${NC}"
+                        fi
+                    done
+                    read -n 1 -s -r -p "按任意键返回..."
+                    continue
+                    ;;
+                5)  # 关联 Rclone
+                    if ! grep -q "RCLONE_MOUNT_PATH" "${STATE_FILE}"; then
+                        echo -e "${RED}错误：Rclone 未配置或未完全配置。请先在主菜单选择 '18' 完成配置。${NC}"; sleep 4; continue
+                    fi
+                    local rclone_mount_path=$(grep "RCLONE_MOUNT_PATH" "${STATE_FILE}" | cut -d'=' -f2)
+                    if ! mount | grep -q "${rclone_mount_path}"; then
+                         echo -e "${RED}错误：Rclone 挂载点 ${rclone_mount_path} 未生效。请检查服务状态。${NC}"; sleep 4; continue
+                    fi
+                    
+                    echo -e "\n${CYAN}--- 关联 Rclone 网盘文件夹 ---${NC}"
+                    for i in ${!container_paths[@]}; do
+                        local c_path=${container_paths[$i]}
+                        local label=${path_labels[$i]}
+                        local default_local_path=${default_local_paths[$i]}
+
+                        # 查找当前行
+                        local line_to_replace=$(grep -E ":${c_path}['\"]?$" "$compose_file" || grep -E ":/downloads['\"]?$" "$compose_file" || grep -E ":/output['\"]?$" "$compose_file" | head -n 1)
+                        if [ -z "$line_to_replace" ]; then continue; fi
+
+                        local current_host_path=$(echo "$line_to_replace" | awk -F: '{print $1}' | sed -e 's/^[ \t-]*//' -e "s/['\"]//g")
+                        
+                        read -p "请输入用于[${label}]的网盘文件夹名 (留空则恢复默认 ${default_local_path}): " rclone_subfolder
+                        
+                        local new_host_path=""
+                        if [ -z "$rclone_subfolder" ]; then
+                           new_host_path=$default_local_path
+                           echo -e "${YELLOW}  -> 正在将 ${label} 恢复为本地路径: ${new_host_path}${NC}"
+                        else
+                           new_host_path="${rclone_mount_path}/${rclone_subfolder}"
+                           echo -e "${YELLOW}  -> 正在将 ${label} 关联到 Rclone 路径: ${new_host_path}${NC}"
+                        fi
+
+                        sudo mkdir -p "${new_host_path}"
+                        local indentation=$(echo "$line_to_replace" | awk '{gsub(/[^ ].*/, ""); print}')
+                        local new_line="${indentation}- '${new_host_path}:${c_path}'"
+
+                        # 使用 '|' 作为 sed 分隔符避免路径中的 '/' 干扰
+                        sudo sed -i "s|${line_to_replace}|${new_line}|" "${compose_file}"
+                    done
+
+                    echo -e "\n${GREEN} ✅ 配置文件更新完毕，正在重启服务以应用更改...${NC}"
+                    (cd $s_path && sudo docker-compose up -d --force-recreate)
+                    sleep 2
+                    echo -e "${GREEN} ✅ 服务已重启！${NC}"
+                    ;;
+                6) sudo docker-compose -f ${compose_file} logs -f --tail 50;;
                 b) continue;;
                 *) echo -e "${RED}     无效操作    !${NC}";;
             esac
-            sleep 2
-        else
-            echo -e "${RED}     无效选择    !${NC}"; sleep 2
+        else # 如果服务不可关联 Rclone
+            echo "1)     启动"
+            echo "2)     停止"
+            echo "3)     重启"
+            echo "4)     查看日志 (按 Ctrl+C 退出)"
+            echo "b)     返回"
+            read -p "    请选择操作: " action_choice
+            case $action_choice in
+                1) (cd $s_path && sudo docker-compose up -d); echo -e "${GREEN}${s_name} 已启动!${NC}";;
+                2) (cd $s_path && sudo docker-compose stop); echo -e "${YELLOW}${s_name} 已停止!${NC}";;
+                3) (cd $s_path && sudo docker-compose restart); echo -e "${CYAN}${s_name} 已重启!${NC}";;
+                4) sudo docker-compose -f ${compose_file} logs -f --tail 50;;
+                b) continue;;
+                *) echo -e "${RED}     无效操作    !${NC}";;
+            esac
         fi
+        sleep 2
     done
 }
 
@@ -1224,6 +1313,9 @@ show_credentials() {
     [ -d "/mnt/Movies" ] && echo "       🎬     电影库 (Jellyfin): /mnt/Movies"
     [ -d "/mnt/TVShows" ] && echo "       📺     电视剧库 (Jellyfin): /mnt/TVShows"
     [ -d "/mnt/Downloads" ] && echo "       🔽     默认下载目录: /mnt/Downloads"
+    if grep -q "RCLONE_MOUNT_PATH" "${STATE_FILE}"; then
+        echo "       ☁️     Rclone 网盘挂载点: $(grep 'RCLONE_MOUNT_PATH' ${STATE_FILE} | cut -d'=' -f2)"
+    fi
 
     echo -e "${RED}==================================================================${NC}"
     echo -e "\n${GREEN}    这是您已保存的所有重要信息。按任意键返回主菜单    ...${NC}"
@@ -1281,17 +1373,26 @@ uninstall_everything() {
         /root/jellyfin_data /root/ai_stack /root/alist_data /root/gitea_data \
         /root/memos_data /root/navidrome_data /root/qbittorrent_data \
         /root/jdownloader_data /root/ytdlp_data /root/.config/rclone
+    
+    # 卸载 Rclone 挂载点
+    if grep -q "RCLONE_MOUNT_PATH" "${STATE_FILE}"; then
+        local rclone_mount_path=$(grep "RCLONE_MOUNT_PATH" "${STATE_FILE}" | cut -d'=' -f2)
+        sudo umount "${rclone_mount_path}" >/dev/null 2>&1
+        sudo rm -rf "${rclone_mount_path}"
+    fi
+    # 清理其他 /mnt 目录
     sudo umount /mnt/* >/dev/null 2>&1
     sudo rm -rf /mnt/*
+
     echo -e "${GREEN}     ✅     所有数据文件夹已清理。    ${NC}"
 
     echo -e "\n${YELLOW}     🚀     [3/6]     正在卸载脚本安装的系统级工具...${NC}"
     # 卸载Rclone服务
-    for service in $(ls /etc/systemd/system/rclone-*.service 2>/dev/null); do
-        sudo systemctl stop $(basename ${service})
-        sudo systemctl disable $(basename ${service})
-        sudo rm -f ${service}
-    done
+    if [ -f "/etc/systemd/system/rclone-vps-mount.service" ]; then
+        sudo systemctl stop rclone-vps-mount.service
+        sudo systemctl disable rclone-vps-mount.service
+        sudo rm -f /etc/systemd/system/rclone-vps-mount.service
+    fi
     sudo systemctl daemon-reload
     # 卸载邮件报告
     (crontab -l 2>/dev/null | grep -v "/usr/local/bin/daily_server_report.sh") | crontab -
