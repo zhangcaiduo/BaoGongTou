@@ -1,9 +1,9 @@
 #!/bin/bash
 #================================================================
-# “    VPS 从零开始装修面板    ” v6.8.0 -    终极对齐 & 还原版
-#    1.   重写菜单输出逻辑，实现中英文环境下的完美对齐。
-#    2.   重构“一键还原毛坯”功能，增加系统级Web服务器检测与清理，并实现脚本自毁。
-#    3.   优化交互与提示文案。
+# “    VPS 从零开始装修面板    ” v6.9.0 -    Tab 对齐最终尝试版
+#    1.   使用Tab制表符进行菜单对齐，这是兼容性最强的终端对齐方案。
+#    2.   简化了菜单显示代码。
+#    3.   包含了v6.8.0的全部功能。
 #     作者     : 張財多 zhangcaiduo.com
 #================================================================
 
@@ -110,32 +110,7 @@ manage_swap() {
 }
 
 
-# ---     检查与菜单显示函数 (对齐重构) ---
-# 计算字符串的可视宽度 (一个汉字计为2，一个ASCII字符计为1)
-get_display_width() {
-    local str="$1"
-    local len=$(echo -n "$str" | wc -m)
-    local non_ascii_len=$(echo -n "$str" | sed 's/[ -~]//g' | wc -m)
-    echo $((len + non_ascii_len))
-}
-
-# 打印带状态的菜单项，并确保对齐
-print_menu_item() {
-    local option_text="$1"
-    local status_text="$2"
-    local total_width=52 # 设定一个基准总宽度
-    local option_width=$(get_display_width "$option_text")
-    
-    local padding_width=$((total_width - option_width))
-    if [ $padding_width -lt 1 ]; then
-        padding_width=1
-    fi
-    
-    local padding=$(printf '%*s' "$padding_width" '')
-    
-    printf "  %s%s%s\n" "$option_text" "$padding" "$status_text"
-}
-
+# ---     检查与菜单显示函数 (Tab对齐重构) ---
 check_and_display() {
     local option_num="$1"
     local text="$2"
@@ -184,7 +159,8 @@ check_and_display() {
         esac
         status_string="[ ✅ ${formatted_details}]"
     fi
-    print_menu_item "$display_text" "$status_string"
+    # 使用 Tab 进行对齐
+    printf "  %-48s\t%s\n" "${display_text}" "${status_string}"
 }
 
 show_main_menu() {
@@ -199,7 +175,7 @@ show_main_menu() {
                                            zhangcaiduo.com
 "
 
-    echo -e "${GREEN}============ VPS 从毛坯房开始装修VPS 包工头面板 v6.8.0 ============================================${NC}"
+    echo -e "${GREEN}============ VPS 从毛坯房开始装修VPS 包工头面板 v6.9.0 ============================================${NC}"
     echo -e "${BLUE}本脚本适用于 Ubuntu 和 Debian 系统的项目部署 ${NC}"
     echo -e "${BLUE}本脚本由小白出于学习与爱好制作，欢迎交流 ${NC}"
     echo -e "${BLUE}本脚本不具任何商业盈利，纯属学习不承担任何法律后果 ${NC}"
@@ -207,9 +183,9 @@ show_main_menu() {
     echo -e "${BLUE}=========================================================================================${NC}"
 
     echo -e "  ${GREEN}---  地基与系统  ---${NC}"
-    print_menu_item "u)  更新系统与软件" "[ apt update && upgrade ]"
-    print_menu_item "m)  恢复至标准系统" "[ unminimize, 仅限 Ubuntu 系统 ]"
-    print_menu_item "s)  配置虚拟内存 (Swap)" "[ 增强低配VPS性能 ]"
+    printf "  %-48s\t%s\n" "u)  更新系统与软件" "[ apt update && upgrade ]"
+    printf "  %-48s\t%s\n" "m)  恢复至标准系统" "[ unminimize, 仅限 Ubuntu 系统 ]"
+    printf "  %-48s\t%s\n" "s)  配置虚拟内存 (Swap)" "[ 增强低配VPS性能 ]"
 
     echo -e "  ${GREEN}---  主体装修选项  ---${NC}"
     check_and_display "1" "部署网络水电总管 (NPM)" "/root/npm_data" "docker:npm_app:81"
@@ -227,15 +203,15 @@ show_main_menu() {
     check_and_display "16" "配置 Rclone 数据同步桥" "${RCLONE_CONFIG_FILE}" "rclone"
 
     echo -e "  ${GREEN}---  高级功能与维护  ---${NC}"
-    print_menu_item "11) 为 AI 大脑安装知识库 (安装模型)" ""
-    print_menu_item "12) 执行 Nextcloud 最终性能优化" ""
-    print_menu_item "13) ${CYAN}进入服务控制中心${NC}" "[ 启停/重启服务 ]"
-    print_menu_item "14) ${CYAN}查看密码与数据路径${NC}" "[ 重要凭证 ]"
-    print_menu_item "15) ${RED}打开“科学”工具箱${NC}" "[ Warp, Argo, OpenVPN ]"
+    printf "  %-48s\n" "11) 为 AI 大脑安装知识库 (安装模型)"
+    printf "  %-48s\n" "12) 执行 Nextcloud 最终性能优化"
+    printf "  %-48s\t%s\n" "13) ${CYAN}进入服务控制中心${NC}" "[ 启停/重启服务 ]"
+    printf "  %-48s\t%s\n" "14) ${CYAN}查看密码与数据路径${NC}" "[ 重要凭证 ]"
+    printf "  %-48s\t%s\n" "15) ${RED}打开“科学”工具箱${NC}" "[ Warp, Argo, OpenVPN ]"
 
     echo -e "  ----------------------------------------------------------------------------------------"
-    print_menu_item "99) ${RED}一键还原毛坯${NC}" "${RED}[ 注：此选项将会卸载所有服务回到清水房！！！ ]${NC}"
-    print_menu_item "q)  退出面板" ""
+    printf "  %-48s\t%s\n" "99) ${RED}一键还原毛坯${NC}" "${RED}[ 注：此选项将会卸载所有服务回到清水房！！！ ]${NC}"
+    printf "  %-48s\t%s\n" "q)  退出面板" ""
     echo -e "${GREEN}===================================================================================================${NC}"
 }
 
