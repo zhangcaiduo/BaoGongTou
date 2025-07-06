@@ -27,6 +27,7 @@
 ```bash
 wget -O vps_installer.sh 'https://raw.githubusercontent.com/zhangcaiduo/BaoGongTou/refs/heads/main/vps_installer.sh' && sudo bash vps_installer.sh
 ```
+![包工头面板运行截图](https://github.com/zhangcaiduo/BaoGongTou/blob/main/%E5%B1%8F%E5%B9%95%E6%88%AA%E5%9B%BE%202025-07-06%20083101.jpg)
 
 **友情提示**:
 1.  首次运行后，脚本会自动创建一个快捷方式。您可以退出SSH重新登录，之后只需输入 `zhangcaiduo` 即可再次打开本面板。
