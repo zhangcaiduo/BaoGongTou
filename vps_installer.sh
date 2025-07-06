@@ -1,9 +1,9 @@
 #!/bin/bash
 #================================================================
-# “    VPS 从零开始装修面板    ” v6.9.0 -    Tab 对齐最终尝试版
-#    1.   使用Tab制表符进行菜单对齐，这是兼容性最强的终端对齐方案。
-#    2.   简化了菜单显示代码。
-#    3.   包含了v6.8.0的全部功能。
+# “    VPS 从零开始装修面板    ” v7.0.0 -    权限修复与菜单重构版
+#    1.   修复了Rclone挂载后，Jellyfin/Navidrome/qBittorrent的访问权限问题。
+#    2.   将“工具箱”和“下载集”拆分为独立菜单项，结构更清晰。
+#    3.   继承了 v6.9.0 的全部功能。
 #     作者     : 張財多 zhangcaiduo.com
 #================================================================
 
@@ -119,14 +119,6 @@ check_and_display() {
     local display_text="${option_num}) ${text}"
     local status_string="[ ❌  未安装 ]"
 
-    # 特殊路径检查逻辑
-    if [[ "$status_info" == "downloader" ]]; then
-        check_path=$([ -d "/root/qbittorrent_data" ] || [ -d "/root/jdownloader_data" ] || [ -d "/root/ytdlp_data" ] && echo "/root/dummy_path" || echo "")
-    fi
-    if [[ "$status_info" == "support_fleet" ]]; then
-        check_path=$([ -d "/root/alist_data" ] || [ -d "/root/gitea_data" ] || [ -d "/root/memos_data" ] || [ -d "/root/navidrome_data" ] && echo "/root/dummy_path" || echo "")
-    fi
-
     if [ -e "$check_path" ]; then
         local type=$(echo "$status_info" | cut -d':' -f1)
         local details=$(echo "$status_info" | cut -d':' -f2-)
@@ -137,21 +129,6 @@ check_and_display() {
                 formatted_details=" 容器:${container_name}, 端口:${port}"
                 ;;
             docker_nopm) formatted_details=" 容器:${details} (已接入总线)";;
-            downloader)
-                local tools=""
-                [ -d "/root/qbittorrent_data" ] && tools+="qBittorrent,"
-                [ -d "/root/jdownloader_data" ] && tools+="JDownloader,"
-                [ -d "/root/ytdlp_data" ] && tools+="yt-dlp,"
-                formatted_details=" 已装: $(echo "$tools" | sed 's/,$//g')"
-                ;;
-            support_fleet)
-                local tools=""
-                [ -d "/root/alist_data" ] && tools+="Alist,"
-                [ -d "/root/gitea_data" ] && tools+="Gitea,"
-                [ -d "/root/memos_data" ] && tools+="Memos,"
-                [ -d "/root/navidrome_data" ] && tools+="Navidrome,"
-                formatted_details=" 已装: $(echo "$tools" | sed 's/,$//g')"
-                ;;
             system) formatted_details=" 系统服务 ";;
             system_port) formatted_details=" 服务端口: ${details}";;
             rclone) formatted_details=" 已配置 "; display_text="${GREEN}${option_num}) ${text}${NC}";;
@@ -175,50 +152,48 @@ show_main_menu() {
                                            zhangcaiduo.com
 "
 
-    echo -e "${GREEN}============ VPS 从毛坯房开始装修VPS 包工头面板 v6.9.0 ============================================${NC}"
+    echo -e "${GREEN}============ VPS 从毛坯房开始装修VPS 包工头面板 v7.0.0 ============================================${NC}"
     echo -e "${BLUE}本脚本适用于 Ubuntu 和 Debian 系统的 VPS 常用项目部署 ${NC}"
-    echo -e "${BLUE}本脚本由小白張財多出于学习与爱好制作，欢迎交流 ${NC}"
-    echo -e "${BLUE}本脚本不具任何商业盈利，纯属学习不承担任何法律后果 ${NC}"
     echo -e "${BLUE}如果您退出了装修面板，输入 zhangcaiduo 可再次调出 ${NC}"
     echo -e "${BLUE}=========================================================================================${NC}"
 
-    echo -e "  ${GREEN}---  地基与系统  ---${NC}"
+    echo -e "  ${GREEN}---  地基与系统 (基础)  ---${NC}"
     printf "  %-48s\t%s\n" "u)  更新系统与软件" "[ apt update && upgrade ]"
     printf "  %-48s\t%s\n" "m)  恢复至标准系统" "[ unminimize, 仅限 Ubuntu 系统 ]"
     printf "  %-48s\t%s\n" "s)  配置虚拟内存 (Swap)" "[ 增强低配VPS性能 ]"
     echo -e "  ----------------------------------------------------------------------------------------"
     echo ""
-    echo ""
-    echo -e "  ${GREEN}---  主体装修选项  ---${NC}"
+    echo -e "  ${GREEN}---  主体装修选项 (应用部署)  ---${NC}"
     check_and_display "1" "部署网络水电总管 (NPM)" "/root/npm_data" "docker:npm_app:81"
     echo -e "      ${YELLOW}首次登陆 NPM 请用你的IP地址加:端口81，默认用户: admin@example.com 密码: changeme${NC}"
-    echo -e "      ${YELLOW}首次登陆 NPM 后请立即修改初始用户名和密码后再进行配置！${NC}"
-    echo -e "      ${YELLOW}关于配置 NPM 的知识，可以观看我的博客，共同学习！${NC}"
-    echo -e "  ----------------------------------------------------------------------------------------"
-    echo ""
+    echo -e "      ${YELLOW}首次登陆后请立即修改密码！配置教程请参考我的博客。${NC}"
     echo ""
     check_and_display "2" "部署 Nextcloud 家庭数据中心" "/root/nextcloud_data" "docker_nopm:nextcloud_app"
     check_and_display "3" "部署 WordPress 个人博客" "/root/wordpress_data" "docker_nopm:wordpress_app"
-    check_and_display "4" "部署 Jellyfin 家庭影院" "/root/jellyfin_data" "docker:jellyfin_app:8096"
-    check_and_display "5" "部署 AI 大脑 (Ollama+WebUI)" "/root/ai_stack" "docker_nopm:open_webui_app"
-    check_and_display "6" "部署家装工具箱 (Alist,Gitea...)" "/root/alist_data" "support_fleet"
-    check_and_display "7" "部署下载工具集 (qBittorrent...)" "/root/qbittorrent_data" "downloader"
+    check_and_display "4" "部署 AI 大脑 (Ollama+WebUI)" "/root/ai_stack" "docker_nopm:open_webui_app"
+    echo ""
+    check_and_display "5" "部署 Jellyfin 家庭影院" "/root/jellyfin_data" "docker:jellyfin_app:8096"
+    check_and_display "6" "部署 Navidrome 音乐服务器" "/root/navidrome_data" "docker:navidrome_app:4533"
+    check_and_display "7" "部署 Alist 网盘挂载" "/root/alist_data" "docker:alist_app:5244"
+    check_and_display "8" "部署 Gitea 代码仓库" "/root/gitea_data" "docker:gitea_app:3000"
+    check_and_display "9" "部署 Memos 轻量笔记" "/root/memos_data" "docker:memos_app:5230"
+    echo ""
+    check_and_display "10" "部署 qBittorrent 下载器" "/root/qbittorrent_data" "docker:qbittorrent_app:8080"
+    check_and_display "11" "部署 JDownloader 下载器" "/root/jdownloader_data" "docker:jdownloader_app:5800"
+    check_and_display "12" "部署 yt-dlp 视频下载器" "/root/ytdlp_data" "docker_nopm:ytdlp_app"
 
     echo -e "  ${GREEN}---  安防与工具  ---${NC}"
-    check_and_display "8" "部署全屋安防系统 (Fail2ban)" "/etc/fail2ban/jail.local" "system"
-    check_and_display "9" "部署远程工作台 (Xfce)" "/etc/xrdp/xrdp.ini" "system_port:3389"
-    check_and_display "10" "部署邮件管家 (自动报告)" "/etc/msmtprc" "system"
-    check_and_display "16" "配置 Rclone 数据同步桥" "${RCLONE_CONFIG_FILE}" "rclone"
+    check_and_display "15" "部署全屋安防系统 (Fail2ban)" "/etc/fail2ban/jail.local" "system"
+    check_and_display "16" "部署远程工作台 (Xfce)" "/etc/xrdp/xrdp.ini" "system_port:3389"
+    check_and_display "17" "部署邮件管家 (自动报告)" "/etc/msmtprc" "system"
+    check_and_display "18" "配置 Rclone 数据同步桥" "${RCLONE_CONFIG_FILE}" "rclone"
 
     echo -e "  ${GREEN}---  高级功能与维护  ---${NC}"
-    printf "  %-48s\n" "11) 为 AI 大脑安装知识库 (安装模型)"
-    printf "  %-48s\n" "12) 执行 Nextcloud 最终性能优化"
-    printf "  %-48s\t%s\n" "13) ${CYAN}进入服务控制中心${NC}" "[ 启停/重启服务 ]"
-    printf "  %-48s\t%s\n" "14) ${CYAN}查看密码与数据路径${NC}" "[ 重要凭证 ]"
-    echo ""
-    echo ""
-    echo -e "  ----------------------------------------------------------------------------------------"
-    printf "  %-48s\t%s\n" "15) ${RED}打开“科学上网”工具箱${NC}" "[ 为IPV6小鸡添加 Warp IPV4 出口, Argo 隧道节点, OpenVPN配置 ]"
+    printf "  %-48s\n" "21) 为 AI 大脑安装知识库 (安装模型)"
+    printf "  %-48s\n" "22) 执行 Nextcloud 最终性能优化"
+    printf "  %-48s\t%s\n" "23) ${CYAN}进入服务控制中心${NC}" "[ 启停/重启服务 ]"
+    printf "  %-48s\t%s\n" "24) ${CYAN}查看密码与数据路径${NC}" "[ 重要凭证 ]"
+    printf "  %-48s\t%s\n" "25) ${RED}打开“科学上网”工具箱${NC}" "[ Warp, Argo, OpenVPN ]"
     echo -e "  ----------------------------------------------------------------------------------------"
     printf "  %-48s\t%s\n" "99) ${RED}一键辞退包工头${NC}" "${RED}[ 注：此选项将会拆卸本脚本！！！ ]${NC}"
     printf "  %-48s\t%s\n" "q)  退出面板" ""
@@ -458,42 +433,7 @@ EOF
     echo -e "\n${GREEN}    按任意键返回主菜单    ...${NC}"; read -n 1 -s
 }
 
-# 4. Jellyfin
-install_jellyfin() {
-    check_npm_installed || return
-    clear
-    echo -e "${BLUE}--- “Jellyfin 家庭影院”建造计划启动！ ---${NC}";
-    sleep 2
-    mkdir -p /root/jellyfin_data/config /mnt/Movies /mnt/TVShows /mnt/Music
-    cat > /root/jellyfin_data/docker-compose.yml <<'EOF'
-version: '3.8'
-services:
-  jellyfin:
-    image: jellyfin/jellyfin:latest
-    container_name: jellyfin_app
-    restart: unless-stopped
-    volumes:
-      - './config:/config'
-      - '/mnt/Movies:/media/movies'
-      - '/mnt/TVShows:/media/tvshows'
-      - '/mnt/Music:/media/music'
-    networks:
-      - npm_network
-
-networks:
-  npm_network:
-    name: npm_data_default
-    external: true
-EOF
-    (cd /root/jellyfin_data && sudo docker-compose up -d)
-    echo -e "${GREEN}     ✅     Jellyfin     已在后台启动！    ${NC}"
-    echo -e "\n${GREEN}===============     ✅     Jellyfin     部署完成        ✅     ===============${NC}"
-    echo "    请在     NPM     中为您规划的域名配置代理，指向     ${BLUE}jellyfin_app:8096${NC}"
-    echo "    媒体库目录已创建    : /mnt/Movies, /mnt/TVShows, /mnt/Music"
-    echo -e "\n${GREEN}    按任意键返回主菜单    ...${NC}"; read -n 1 -s
-}
-
-# 5. AI     核心
+# 4. AI     核心
 install_ai_suite() {
     check_npm_installed || return
     read -p "    请输入您为     AI     规划的子域名     (    例如     ai.zhangcaiduo.com): " AI_DOMAIN
@@ -538,35 +478,88 @@ EOF
     install_ai_model
 }
 
-# 6.     家装工具箱 (交互重构)
-install_support_fleet() {
+# 5. Jellyfin
+install_jellyfin() {
     check_npm_installed || return
-    while true; do
-        clear
-        echo -e "${BLUE}--- “家装工具箱”按需安装 ---${NC}"
-        echo "    请选择要安装的工具 (输入数字安装，或 'b' 返回):"
-        
-        [ -d "/root/alist_data" ] && alist_status="${GREEN}[ ✅  已安装 ]${NC}" || alist_status=""
-        [ -d "/root/gitea_data" ] && gitea_status="${GREEN}[ ✅  已安装 ]${NC}" || gitea_status=""
-        [ -d "/root/memos_data" ] && memos_status="${GREEN}[ ✅  已安装 ]${NC}" || memos_status=""
-        [ -d "/root/navidrome_data" ] && navidrome_status="${GREEN}[ ✅  已安装 ]${NC}" || navidrome_status=""
+    clear
+    echo -e "${BLUE}--- “Jellyfin 家庭影院”建造计划启动！ ---${NC}";
+    sleep 2
+    mkdir -p /root/jellyfin_data/config /mnt/Movies /mnt/TVShows /mnt/Music
+    cat > /root/jellyfin_data/docker-compose.yml <<'EOF'
+version: '3.8'
+services:
+  jellyfin:
+    image: jellyfin/jellyfin:latest
+    container_name: jellyfin_app
+    restart: unless-stopped
+    environment:
+      - 'PUID=1000'
+      - 'PGID=1000'
+      - 'TZ=Asia/Shanghai'
+    volumes:
+      - './config:/config'
+      - '/mnt/Movies:/media/movies'
+      - '/mnt/TVShows:/media/tvshows'
+      - '/mnt/Music:/media/music'
+    networks:
+      - npm_network
 
-        printf "  1) Alist (网盘挂载) %s\n" "$alist_status"
-        printf "  2) Gitea (代码仓库) %s\n" "$gitea_status"
-        printf "  3) Memos (轻量笔记) %s\n" "$memos_status"
-        printf "  4) Navidrome (音乐服务器) %s\n" "$navidrome_status"
-        echo "------------------------------------"
-        echo "  b) 返回主菜单"
-        read -p "    请输入您的选择: " tool_choice
+networks:
+  npm_network:
+    name: npm_data_default
+    external: true
+EOF
+    (cd /root/jellyfin_data && sudo docker-compose up -d)
+    echo -e "${GREEN}     ✅     Jellyfin     已在后台启动！    ${NC}"
+    echo -e "\n${GREEN}===============     ✅     Jellyfin     部署完成        ✅     ===============${NC}"
+    echo "    请在     NPM     中为您规划的域名配置代理，指向     ${BLUE}jellyfin_app:8096${NC}"
+    echo "    媒体库目录已创建    : /mnt/Movies, /mnt/TVShows, /mnt/Music"
+    echo -e "\n${GREEN}    按任意键返回主菜单    ...${NC}"; read -n 1 -s
+}
 
-        case $tool_choice in
-            1)
-                if [ -d "/root/alist_data" ]; then
-                    echo -e "${YELLOW}Alist 已安装。${NC}"; sleep 2; continue
-                fi
-                echo -e "\n${YELLOW}     🚀        部署 Alist...${NC}"
-                mkdir -p /root/alist_data
-                cat >/root/alist_data/docker-compose.yml <<'EOF'
+# 6. Navidrome
+install_navidrome() {
+    check_npm_installed || return
+    clear
+    echo -e "${BLUE}--- “Navidrome 音乐服务器”部署计划启动！ ---${NC}"
+    sleep 2
+    mkdir -p /root/navidrome_data /mnt/Music
+    cat > /root/navidrome_data/docker-compose.yml <<'EOF'
+version: '3.8'
+services:
+  navidrome:
+    image: deluan/navidrome:latest
+    container_name: navidrome_app
+    restart: unless-stopped
+    volumes:
+      - '/mnt/Music:/music'
+      - './data:/data'
+    environment:
+      - 'PUID=1000'
+      - 'PGID=1000'
+      - 'ND_LOGLEVEL=info'
+      - 'TZ=Asia/Shanghai'
+    networks:
+      - npm_network
+networks:
+  npm_network:
+    name: npm_data_default
+    external: true
+EOF
+    (cd /root/navidrome_data && sudo docker-compose up -d)
+    echo -e "${GREEN} ✅  Navidrome 已启动！内部端口: 4533. 媒体库: /mnt/Music ${NC}"
+    echo "    请在     NPM     中为您规划的域名配置代理，指向     ${BLUE}navidrome_app:4533${NC}"
+    echo -e "\n${GREEN}    按任意键返回主菜单    ...${NC}"; read -n 1 -s
+}
+
+# 7. Alist
+install_alist() {
+    check_npm_installed || return
+    clear
+    echo -e "${BLUE}--- “Alist 网盘挂载”部署计划启动！ ---${NC}"
+    sleep 2
+    mkdir -p /root/alist_data
+    cat >/root/alist_data/docker-compose.yml <<'EOF'
 version: '3.8'
 services:
   alist:
@@ -582,18 +575,21 @@ networks:
     name: npm_data_default
     external: true
 EOF
-                (cd /root/alist_data && sudo docker-compose up -d)
-                echo -e "${GREEN} ✅  Alist 已启动！内部端口: 5244 ${NC}"
-                echo -e "${CYAN} 请使用以下命令查看初始密码: sudo docker exec alist_app ./alist admin ${NC}"
-                sleep 5
-                ;;
-            2)
-                if [ -d "/root/gitea_data" ]; then
-                    echo -e "${YELLOW}Gitea 已安装。${NC}"; sleep 2; continue
-                fi
-                echo -e "\n${YELLOW}     🚀        部署 Gitea...${NC}"
-                mkdir -p /root/gitea_data
-                cat >/root/gitea_data/docker-compose.yml <<'EOF'
+    (cd /root/alist_data && sudo docker-compose up -d)
+    echo -e "${GREEN} ✅  Alist 已启动！内部端口: 5244 ${NC}"
+    echo "    请在     NPM     中为您规划的域名配置代理，指向     ${BLUE}alist_app:5244${NC}"
+    echo -e "${CYAN} 请使用以下命令查看初始密码: sudo docker exec alist_app ./alist admin ${NC}"
+    echo -e "\n${GREEN}    按任意键返回主菜单    ...${NC}"; read -n 1 -s
+}
+
+# 8. Gitea
+install_gitea() {
+    check_npm_installed || return
+    clear
+    echo -e "${BLUE}--- “Gitea 代码仓库”部署计划启动！ ---${NC}"
+    sleep 2
+    mkdir -p /root/gitea_data
+    cat >/root/gitea_data/docker-compose.yml <<'EOF'
 version: '3.8'
 services:
   server:
@@ -614,16 +610,20 @@ networks:
     name: npm_data_default
     external: true
 EOF
-                (cd /root/gitea_data && sudo docker-compose up -d)
-                echo -e "${GREEN} ✅  Gitea 已启动！内部端口: 3000 ${NC}"; sleep 3
-                ;;
-            3)
-                if [ -d "/root/memos_data" ]; then
-                    echo -e "${YELLOW}Memos 已安装。${NC}"; sleep 2; continue
-                fi
-                echo -e "\n${YELLOW}     🚀        部署 Memos...${NC}"
-                mkdir -p /root/memos_data
-                cat >/root/memos_data/docker-compose.yml <<'EOF'
+    (cd /root/gitea_data && sudo docker-compose up -d)
+    echo -e "${GREEN} ✅  Gitea 已启动！内部端口: 3000 ${NC}"
+    echo "    请在     NPM     中为您规划的域名配置代理，指向     ${BLUE}gitea_app:3000${NC}"
+    echo -e "\n${GREEN}    按任意键返回主菜单    ...${NC}"; read -n 1 -s
+}
+
+# 9. Memos
+install_memos() {
+    check_npm_installed || return
+    clear
+    echo -e "${BLUE}--- “Memos 轻量笔记”部署计划启动！ ---${NC}"
+    sleep 2
+    mkdir -p /root/memos_data
+    cat >/root/memos_data/docker-compose.yml <<'EOF'
 version: '3.8'
 services:
   memos:
@@ -639,74 +639,20 @@ networks:
     name: npm_data_default
     external: true
 EOF
-                (cd /root/memos_data && sudo docker-compose up -d)
-                echo -e "${GREEN} ✅  Memos 已启动！内部端口: 5230 ${NC}"; sleep 3
-                ;;
-            4)
-                if [ -d "/root/navidrome_data" ]; then
-                    echo -e "${YELLOW}Navidrome 已安装。${NC}"; sleep 2; continue
-                fi
-                echo -e "\n${YELLOW}     🚀        部署 Navidrome...${NC}"
-                mkdir -p /root/navidrome_data /mnt/Music
-                cat > /root/navidrome_data/docker-compose.yml <<'EOF'
-version: '3.8'
-services:
-  navidrome:
-    image: deluan/navidrome:latest
-    container_name: navidrome_app
-    restart: unless-stopped
-    volumes:
-      - '/mnt/Music:/music'
-      - './data:/data'
-    environment:
-      - 'ND_LOGLEVEL=info'
-      - 'TZ=Asia/Shanghai'
-    networks:
-      - npm_network
-networks:
-  npm_network:
-    name: npm_data_default
-    external: true
-EOF
-                (cd /root/navidrome_data && sudo docker-compose up -d)
-                echo -e "${GREEN} ✅  Navidrome 已启动！内部端口: 4533. 媒体库: /mnt/Music ${NC}"; sleep 3
-                ;;
-            b|B)
-                echo -e "${GREEN}返回主菜单...${NC}"; sleep 1; break ;;
-            *)
-                echo -e "${RED} 无效选择!${NC}"; sleep 1 ;;
-        esac
-    done
+    (cd /root/memos_data && sudo docker-compose up -d)
+    echo -e "${GREEN} ✅  Memos 已启动！内部端口: 5230 ${NC}"
+    echo "    请在     NPM     中为您规划的域名配置代理，指向     ${BLUE}memos_app:5230${NC}"
+    echo -e "\n${GREEN}    按任意键返回主菜单    ...${NC}"; read -n 1 -s
 }
 
-
-# 7.     下载工具集 (交互重构)
-install_downloader_suite() {
+# 10. qBittorrent
+install_qbittorrent() {
     check_npm_installed || return
-    while true; do
-        clear
-        echo -e "${BLUE}--- “下载工具集”按需安装 ---${NC}"
-        echo "    请选择要安装的下载工具 (输入数字安装，或 'b' 返回):"
-        
-        [ -d "/root/qbittorrent_data" ] && qb_status="${GREEN}[ ✅  已安装 ]${NC}" || qb_status=""
-        [ -d "/root/jdownloader_data" ] && jd_status="${GREEN}[ ✅  已安装 ]${NC}" || jd_status=""
-        [ -d "/root/ytdlp_data" ] && yt_status="${GREEN}[ ✅  已安装 ]${NC}" || yt_status=""
-
-        printf "  1) qBittorrent (稳定版) %s\n" "$qb_status"
-        printf "  2) JDownloader (带密码) %s\n" "$jd_status"
-        printf "  3) yt-dlp (视频下载) %s\n" "$yt_status"
-        echo "------------------------------------"
-        echo "  b) 返回主菜单"
-        read -p "    请输入您的选择: " downloader_choice
-
-        case $downloader_choice in
-            1)
-                if [ -d "/root/qbittorrent_data" ]; then
-                    echo -e "${YELLOW}qBittorrent 已安装。${NC}"; sleep 2; continue
-                fi
-                echo -e "\n${YELLOW}     🚀        部署 qBittorrent...${NC}"
-                mkdir -p /root/qbittorrent_data /mnt/Downloads
-                cat > /root/qbittorrent_data/docker-compose.yml <<'EOF'
+    clear
+    echo -e "${BLUE}--- “qBittorrent 下载器”部署计划启动！ ---${NC}"
+    sleep 2
+    mkdir -p /root/qbittorrent_data /mnt/Downloads
+    cat > /root/qbittorrent_data/docker-compose.yml <<'EOF'
 version: '3.8'
 services:
   qbittorrent:
@@ -728,17 +674,21 @@ networks:
     name: npm_data_default
     external: true
 EOF
-                (cd /root/qbittorrent_data && sudo docker-compose up -d)
-                echo -e "${GREEN} ✅  qBittorrent 已启动！内部端口: 8080, 下载目录: /mnt/Downloads ${NC}"; sleep 4
-                ;;
-            2)
-                if [ -d "/root/jdownloader_data" ]; then
-                    echo -e "${YELLOW}JDownloader 已安装。${NC}"; sleep 2; continue
-                fi
-                echo -e "\n${YELLOW}     🚀        部署 JDownloader...${NC}"
-                JDOWNLOADER_PASS="VNC-Pass-$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 8)"
-                mkdir -p /root/jdownloader_data /mnt/Downloads
-                cat > /root/jdownloader_data/docker-compose.yml <<EOF
+    (cd /root/qbittorrent_data && sudo docker-compose up -d)
+    echo -e "${GREEN} ✅  qBittorrent 已启动！内部端口: 8080, 下载目录: /mnt/Downloads ${NC}"
+    echo "    请在     NPM     中为您规划的域名配置代理，指向     ${BLUE}qbittorrent_app:8080${NC}"
+    echo -e "\n${GREEN}    按任意键返回主菜单    ...${NC}"; read -n 1 -s
+}
+
+# 11. JDownloader
+install_jdownloader() {
+    check_npm_installed || return
+    clear
+    echo -e "${BLUE}--- “JDownloader 下载器”部署计划启动！ ---${NC}"
+    sleep 2
+    JDOWNLOADER_PASS="VNC-Pass-$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 8)"
+    mkdir -p /root/jdownloader_data /mnt/Downloads
+    cat > /root/jdownloader_data/docker-compose.yml <<EOF
 version: '3.8'
 services:
   jdownloader-2:
@@ -760,19 +710,23 @@ networks:
     name: npm_data_default
     external: true
 EOF
-                (cd /root/jdownloader_data && sudo docker-compose up -d)
-                echo "JDOWNLOADER_VNC_PASSWORD=${JDOWNLOADER_PASS}" >> ${STATE_FILE}
-                echo -e "${GREEN} ✅  JDownloader 已启动！VNC 密码 ${JDOWNLOADER_PASS} 已保存。内部端口 5800 ${NC}"; sleep 4
-                ;;
-            3)
-                if [ -d "/root/ytdlp_data" ]; then
-                    echo -e "${YELLOW}yt-dlp 已安装。${NC}"; sleep 2; continue
-                fi
-                read -p "    请输入您为 yt-dlp 规划的子域名 (例如 ytdl.zhangcaiduo.com): " YTDL_DOMAIN
-                if [ -z "$YTDL_DOMAIN" ]; then echo -e "${RED}yt-dlp 域名不能为空，跳过安装。${NC}"; sleep 2; continue; fi
-                echo -e "\n${YELLOW}     🚀        部署 yt-dlp...${NC}"
-                mkdir -p /root/ytdlp_data /mnt/Downloads
-                cat > /root/ytdlp_data/docker-compose.yml <<EOF
+    (cd /root/jdownloader_data && sudo docker-compose up -d)
+    echo "JDOWNLOADER_VNC_PASSWORD=${JDOWNLOADER_PASS}" >> ${STATE_FILE}
+    echo -e "${GREEN} ✅  JDownloader 已启动！VNC 密码 ${JDOWNLOADER_PASS} 已保存。内部端口 5800 ${NC}"
+    echo "    请在     NPM     中为您规划的域名配置代理，指向     ${BLUE}jdownloader_app:5800${NC}"
+    echo -e "\n${GREEN}    按任意键返回主菜单    ...${NC}"; read -n 1 -s
+}
+
+# 12. yt-dlp
+install_ytdlp() {
+    check_npm_installed || return
+    clear
+    read -p "    请输入您为 yt-dlp 规划的子域名 (例如 ytdl.zhangcaiduo.com): " YTDL_DOMAIN
+    if [ -z "$YTDL_DOMAIN" ]; then echo -e "${RED}yt-dlp 域名不能为空，安装取消。${NC}"; sleep 2; return; fi
+    echo -e "${BLUE}--- “yt-dlp 视频下载器”部署计划启动！ ---${NC}"
+    sleep 2
+    mkdir -p /root/ytdlp_data /mnt/Downloads
+    cat > /root/ytdlp_data/docker-compose.yml <<EOF
 version: '3.8'
 services:
   ytdlp-ui:
@@ -791,20 +745,15 @@ networks:
     name: npm_data_default
     external: true
 EOF
-                (cd /root/ytdlp_data && sudo docker-compose up -d)
-                echo "YTDL_DOMAIN=${YTDL_DOMAIN}" >> ${STATE_FILE}
-                echo -e "${GREEN} ✅  yt-dlp 已启动！内部端口 8080。请配置NPM反代到 ytdlp_app:8080 ${NC}"; sleep 4
-                ;;
-            b|B)
-                echo -e "${GREEN}返回主菜单...${NC}"; sleep 1; break ;;
-            *)
-                echo -e "${RED} 无效选择!${NC}"; sleep 1 ;;
-        esac
-    done
+    (cd /root/ytdlp_data && sudo docker-compose up -d)
+    echo "YTDL_DOMAIN=${YTDL_DOMAIN}" >> ${STATE_FILE}
+    echo -e "${GREEN} ✅  yt-dlp 已启动！内部端口 8080。请配置NPM反代到 ytdlp_app:8080 ${NC}"
+    echo "    请在     NPM     中为     ${BLUE}${YTDL_DOMAIN}${NC} 配置代理，指向     ${BLUE}ytdlp_app:8080${NC}"
+    echo -e "\n${GREEN}    按任意键返回主菜单    ...${NC}"; read -n 1 -s
 }
 
 
-# 8. Fail2ban
+# 15. Fail2ban
 install_fail2ban() {
     clear
     echo -e "${BLUE}--- “全屋安防系统”部署计划启动！ ---${NC}";
@@ -844,7 +793,7 @@ EOF
     echo -e "\n${GREEN}    按任意键返回主菜单    ...${NC}"; read -n 1 -s
 }
 
-# 9.     远程桌面
+# 16.     远程桌面
 install_desktop_env() {
     clear
     echo -e "${BLUE}--- “远程工作台”建造计划启动！ ---${NC}";
@@ -885,7 +834,7 @@ install_desktop_env() {
     echo -e "\n${GREEN}    按任意键返回主菜单    ...${NC}"; read -n 1 -s
 }
 
-# 10.     邮件管家
+# 17.     邮件管家
 install_mail_reporter() {
     clear
     echo -e "${BLUE}--- “服务器每日管家”安装程序 ---${NC}";
@@ -948,7 +897,134 @@ EOF
     echo -e "\n${GREEN}    按任意键返回主菜单    ...${NC}"; read -n 1 -s
 }
 
-# 11.     安装     AI     知识库
+# 18. Rclone     数据同步桥
+configure_rclone_engine() {
+    clear
+    echo -e "${BLUE}--- “Rclone 数据同步桥”配置向导 ---${NC}"
+
+    if ! command -v rclone &> /dev/null; then
+        echo -e "\n${YELLOW}     🚀        正在为您安装    Rclone    主程序    ...${NC}"
+        curl https://rclone.org/install.sh | sudo bash
+        sudo apt-get install -y fuse3
+        echo -e "${GREEN}     ✅     Rclone    已安装完毕！    ${NC}"
+        sleep 2
+    fi
+
+    if [ ! -f "${RCLONE_CONFIG_FILE}" ]; then
+        echo -e "\n${YELLOW}     未检测到    Rclone    配置文件。   ${NC}"
+        echo -e "${CYAN}     即将启动    Rclone    官方交互式配置工具   ...${NC}"
+        echo "----------------------------------------------------------"
+        echo -e "     您将进入一个问答式配置流程，请根据提示操作：   "
+        echo -e "  - ${YELLOW}   新建    remote    时，名字建议设为   : onedrive${NC}"
+        echo -e "  - ${YELLOW}   当询问    'Use auto config?' 时，必须选    'n' (no)${NC}"
+        echo -e "  - ${YELLOW}   其他选项请根据您的实际情况选择。   ${NC}"
+        echo "----------------------------------------------------------"
+        read -p "     准备好后，请按任意键继续   ..." -n 1 -s
+        echo -e "\n"
+        rclone config
+        if [ ! -f "${RCLONE_CONFIG_FILE}" ]; then
+            echo -e "\n${RED}     错误：配置似乎未成功保存。请重新尝试。   ${NC}"
+            sleep 3
+            return
+        fi
+        echo -e "\n${GREEN}     ✅        检测到    Rclone    配置文件已成功创建！    ${NC}"
+        sleep 2
+    fi
+
+    echo -e "\n${GREEN}  Rclone    连接已配置，现在开始设置自动同步文件夹。   ${NC}"
+    sleep 2
+
+    while true; do
+        clear
+        echo -e "\n${CYAN}---     配置数据同步点 (自动同步文件夹) ---${NC}"
+        echo "    您可以多次选择，为不同的文件夹建立独立的同步通道。    "
+        echo "----------------------------------------------------------"
+        display_rclone_sync_status() {
+            local service_file="/etc/systemd/system/$2.service"
+            local text="$1"
+            if [ -f "$service_file" ]; then
+                echo -e "${GREEN}${text} [ ✅  已配置同步 ]${NC}"
+            else
+                echo -e "${text}"
+            fi
+        }
+        display_rclone_sync_status "  1)     同步     [Music]     文件夹 " "rclone-music"
+        display_rclone_sync_status "  2)     同步     [Movies]     文件夹 " "rclone-movies"
+        display_rclone_sync_status "  3)     同步     [TVShows]    文件夹 " "rclone-tvshows"
+        display_rclone_sync_status "  4)     同步     [Downloads]     文件夹 " "rclone-downloads"
+        echo "  5)     同步自定义文件夹    "
+        echo "----------------------------------------------------------"
+        echo "  b)     完成并返回主菜单    "
+        read -p "    请选择要同步的文件夹    : " mount_choice
+
+        local onedrive_path=""
+        local local_path=""
+        local service_name=""
+
+        case $mount_choice in
+            1) onedrive_path="Music"; local_path="/mnt/Music"; service_name="rclone-music";;
+            2) onedrive_path="Movies"; local_path="/mnt/Movies"; service_name="rclone-movies";;
+            3) onedrive_path="TVShows"; local_path="/mnt/TVShows"; service_name="rclone-tvshows";;
+            4) onedrive_path="Downloads"; local_path="/mnt/Downloads"; service_name="rclone-downloads";;
+            5)
+                read -p "    请输入您     OneDrive     中的文件夹名     (    例如     'MyFiles'): " custom_od_path
+                read -p "    请输入您想在     VPS     上创建的本地路径     (    例如     '/mnt/myfiles'): " custom_local_path
+                if [ -z "$custom_od_path" ] || [ -z "$custom_local_path" ]; then
+                    echo -e "${RED}     文件夹名和路径均不能为空！    ${NC}"; sleep 2; continue
+                fi
+                onedrive_path=$custom_od_path
+                local_path=$custom_local_path
+                sanitized_name=$(echo "$custom_od_path" | tr -d '/')
+                service_name="rclone-$(echo "$sanitized_name" | tr '[:upper:]' '[:lower:]' | tr -d ' ')"
+                ;;
+            b) break;;
+            *) echo -e "${RED}     无效选择    !${NC}"; sleep 2; continue;;
+        esac
+
+        echo -e "\n${YELLOW}     正在为     ${onedrive_path}     创建同步通道    ...${NC}"
+        sudo mkdir -p "${local_path}"
+        sudo tee "/etc/systemd/system/${service_name}.service" > /dev/null <<EOF
+[Unit]
+Description=Rclone Mount for OneDrive (${onedrive_path})
+Wants=network-online.target
+After=network-online.target
+[Service]
+Type=simple
+User=root
+Group=root
+RestartSec=10
+Restart=on-failure
+ExecStart=/usr/bin/rclone mount onedrive:${onedrive_path} ${local_path} \\
+--config ${RCLONE_CONFIG_FILE} \\
+--uid 1000 \\
+--gid 1000 \\
+--allow-other \\
+--allow-non-empty \\
+--vfs-cache-mode writes \\
+--vfs-cache-max-size 5G \\
+--log-level INFO \\
+--log-file ${RCLONE_LOG_FILE}
+ExecStop=/bin/fusermount -u ${local_path}
+[Install]
+WantedBy=default.target
+EOF
+
+        sudo systemctl daemon-reload
+        sudo systemctl enable --now "${service_name}.service"
+        sleep 2
+        if systemctl is-active --quiet "${service_name}.service"; then
+            echo -e "${GREEN}     ✅        同步通道     ${onedrive_path} -> ${local_path}     已激活！    ${NC}"
+        else
+            echo -e "${RED}     ❌        同步通道启动失败！请检查日志。    ${NC}"
+            echo -e "${YELLOW}     显示最近的     10     行日志     (${RCLONE_LOG_FILE}):${NC}"
+            sudo tail -n 10 ${RCLONE_LOG_FILE}
+        fi
+        sleep 3
+    done
+    echo -e "\n${GREEN}Rclone     数据同步桥配置完成！按任意键返回主菜单    ...${NC}"; read -n 1 -s
+}
+
+# 21.     安装     AI     知识库
 install_ai_model() {
     if [ ! -d "/root/ai_stack" ]; then echo -e "${RED}     错误：AI 大脑未安装!${NC}"; sleep 3; return; fi
     clear
@@ -982,7 +1058,7 @@ install_ai_model() {
     echo -e "\n${GREEN}    按任意键返回主菜单    ...${NC}"; read -n 1 -s
 }
 
-# 12. Nextcloud     优化
+# 22. Nextcloud     优化
 run_nextcloud_optimization() {
     if [ ! -d "/root/nextcloud_data" ]; then echo -e "${RED}     错误：Nextcloud 套件未安装!${NC}"; sleep 3; return; fi
     clear
@@ -1013,7 +1089,7 @@ run_nextcloud_optimization() {
     echo -e "\n${GREEN}    按任意键返回主菜单    ...${NC}"; read -n 1 -s
 }
 
-# 13.     服务控制中心
+# 23.     服务控制中心
 show_service_control_panel() {
     while true; do
         clear
@@ -1022,10 +1098,10 @@ show_service_control_panel() {
 
         declare -a services=(
             "Nextcloud 数据中心:/root/nextcloud_data" "网络水电总管 (NPM):/root/npm_data" "OnlyOffice 办公室:/root/onlyoffice_data"
-            "WordPress 博客:/root/wordpress_data" "Jellyfin 影院:/root/jellyfin_data" "AI 大脑:/root/ai_stack"
-            "Alist:/root/alist_data" "Gitea:/root/gitea_data" "Memos:/root/memos_data"
-            "Navidrome:/root/navidrome_data" "qBittorrent:/root/qbittorrent_data"
-            "JDownloader:/root/jdownloader_data" "yt-dlp:/root/ytdlp_data"
+            "WordPress 博客:/root/wordpress_data" "AI 大脑:/root/ai_stack" "Jellyfin 影院:/root/jellyfin_data" 
+            "Navidrome 音乐:/root/navidrome_data" "Alist 网盘:/root/alist_data" "Gitea 仓库:/root/gitea_data" 
+            "Memos 笔记:/root/memos_data" "qBittorrent:/root/qbittorrent_data" "JDownloader:/root/jdownloader_data" 
+            "yt-dlp 下载:/root/ytdlp_data"
         )
 
         local i=1
@@ -1081,7 +1157,7 @@ show_service_control_panel() {
     done
 }
 
-# 14.     显示凭证
+# 24.     显示凭证
 show_credentials() {
     if [ ! -f "${STATE_FILE}" ]; then echo -e "\n${YELLOW}     尚未开始装修，没有凭证信息。    ${NC}"; sleep 2; return; fi
     clear
@@ -1109,7 +1185,7 @@ show_credentials() {
     read -n 1 -s
 }
 
-# 15.     科学工具箱
+# 25.     科学工具箱
 install_science_tools() {
     clear
     echo -e "${RED}--- “    科学    ”    工具箱     ---${NC}"
@@ -1132,132 +1208,6 @@ install_science_tools() {
     esac
     echo -e "\n${GREEN}    操作完成，按任意键返回主菜单    ...${NC}"; read -n 1 -s
 }
-
-# 16. Rclone     数据同步桥
-configure_rclone_engine() {
-    clear
-    echo -e "${BLUE}--- “Rclone 数据同步桥”配置向导 (v6.3 人机协同版) ---${NC}"
-
-    if ! command -v rclone &> /dev/null; then
-        echo -e "\n${YELLOW}     🚀        正在为您安装    Rclone    主程序    ...${NC}"
-        curl https://rclone.org/install.sh | sudo bash
-        sudo apt-get install -y fuse3
-        echo -e "${GREEN}     ✅     Rclone    已安装完毕！    ${NC}"
-        sleep 2
-    fi
-
-    if [ ! -f "${RCLONE_CONFIG_FILE}" ]; then
-        echo -e "\n${YELLOW}     未检测到    Rclone    配置文件。   ${NC}"
-        echo -e "${CYAN}     即将启动    Rclone    官方交互式配置工具   ...${NC}"
-        echo "----------------------------------------------------------"
-        echo -e "     您将进入一个问答式配置流程，请根据我之前的提示操作：   "
-        echo -e "  - ${YELLOW}   新建    remote    时，名字必须设为   : onedrive${NC}"
-        echo -e "  - ${YELLOW}   当询问    'Use auto config?' 时，必须选    'n' (no)${NC}"
-        echo -e "  - ${YELLOW}   其他选项请根据您的实际情况选择。   ${NC}"
-        echo "----------------------------------------------------------"
-        read -p "     准备好后，请按任意键继续   ..." -n 1 -s
-        echo -e "\n"
-        rclone config
-        if [ ! -f "${RCLONE_CONFIG_FILE}" ]; then
-            echo -e "\n${RED}     错误：配置似乎未成功保存。请重新尝试。   ${NC}"
-            sleep 3
-            return
-        fi
-        echo -e "\n${GREEN}     ✅        检测到    Rclone    配置文件已成功创建！    ${NC}"
-        sleep 2
-    fi
-
-    echo -e "\n${GREEN}  Rclone    连接已配置，现在开始设置自动同步文件夹。   ${NC}"
-    sleep 2
-
-    while true; do
-        clear
-        echo -e "\n${CYAN}---     配置数据同步点 (自动同步文件夹) ---${NC}"
-        echo "    您可以多次选择，为不同的文件夹建立独立的同步通道。    "
-        echo "----------------------------------------------------------"
-        display_rclone_sync_status() {
-            local service_file="/etc/systemd/system/$2.service"
-            local text="$1"
-            if [ -f "$service_file" ]; then
-                echo -e "${GREEN}${text} [ ✅  已配置同步 ]${NC}"
-            else
-                echo -e "${text}"
-            fi
-        }
-        display_rclone_sync_status "  1)     同步     [Music]     文件夹 " "rclone-music"
-        display_rclone_sync_status "  2)     同步     [Movies]     文件夹 " "rclone-movies"
-        display_rclone_sync_status "  3)     同步     [Downloads]     文件夹 " "rclone-downloads"
-        display_rclone_sync_status "  4)     同步     [Documents]     文件夹 " "rclone-documents"
-        echo "  5)     同步自定义文件夹    "
-        echo "----------------------------------------------------------"
-        echo "  b)     完成并返回主菜单    "
-        read -p "    请选择要同步的文件夹    : " mount_choice
-
-        local onedrive_path=""
-        local local_path=""
-        local service_name=""
-
-        case $mount_choice in
-            1) onedrive_path="Music"; local_path="/mnt/Music"; service_name="rclone-music";;
-            2) onedrive_path="Movies"; local_path="/mnt/Movies"; service_name="rclone-movies";;
-            3) onedrive_path="Downloads"; local_path="/mnt/Downloads"; service_name="rclone-downloads";;
-            4) onedrive_path="Documents"; local_path="/mnt/Documents"; service_name="rclone-documents";;
-            5)
-                read -p "    请输入您     OneDrive     中的文件夹名     (    例如     'MyFiles'): " custom_od_path
-                read -p "    请输入您想在     VPS     上创建的本地路径     (    例如     '/mnt/myfiles'): " custom_local_path
-                if [ -z "$custom_od_path" ] || [ -z "$custom_local_path" ]; then
-                    echo -e "${RED}     文件夹名和路径均不能为空！    ${NC}"; sleep 2; continue
-                fi
-                onedrive_path=$custom_od_path
-                local_path=$custom_local_path
-                sanitized_name=$(echo "$custom_od_path" | tr -d '/')
-                service_name="rclone-$(echo "$sanitized_name" | tr '[:upper:]' '[:lower:]' | tr -d ' ')"
-                ;;
-            b) break;;
-            *) echo -e "${RED}     无效选择    !${NC}"; sleep 2; continue;;
-        esac
-
-        echo -e "\n${YELLOW}     正在为     ${onedrive_path}     创建同步通道    ...${NC}"
-        sudo mkdir -p "${local_path}"
-        sudo tee "/etc/systemd/system/${service_name}.service" > /dev/null <<EOF
-[Unit]
-Description=Rclone Mount for OneDrive (${onedrive_path})
-Wants=network-online.target
-After=network-online.target
-[Service]
-Type=simple
-User=root
-Group=root
-RestartSec=10
-Restart=on-failure
-ExecStart=/usr/bin/rclone mount onedrive:${onedrive_path} ${local_path} \\
---config ${RCLONE_CONFIG_FILE} \\
---allow-other \\
---allow-non-empty \\
---vfs-cache-mode writes \\
---vfs-cache-max-size 5G \\
---log-level INFO \\
---log-file ${RCLONE_LOG_FILE}
-ExecStop=/bin/fusermount -u ${local_path}
-[Install]
-WantedBy=default.target
-EOF
-
-        sudo systemctl daemon-reload
-        sudo systemctl enable --now "${service_name}.service"
-        sleep 2
-        if systemctl is-active --quiet "${service_name}.service"; then
-            echo -e "${GREEN}     ✅        同步通道     ${onedrive_path} -> ${local_path}     已激活！    ${NC}"
-        else
-            echo -e "${RED}     ❌        同步通道启动失败！请检查日志。    ${NC}"
-            echo -e "${YELLOW}     显示最近的     10     行日志     (${RCLONE_LOG_FILE}):${NC}"
-            sudo tail -n 10 ${RCLONE_LOG_FILE}
-        fi
-        sleep 3
-    done
-    echo -e "\n${GREEN}Rclone     数据同步桥配置完成！按任意键返回主菜单    ...${NC}"; read -n 1 -s
-}
-
 
 # 99.     一键还原毛坯 (终极重构版)
 uninstall_everything() {
@@ -1361,7 +1311,7 @@ uninstall_everything() {
 # ---     主循环     ---
 while true; do
     show_main_menu
-    read -p "    请输入您的选择 (u, m, s, 1-16, 99, q): " choice
+    read -p "    请输入您的选择 (u, m, s, 1-25, 99, q): " choice
 
     case $choice in
         u|U) update_system ;;
@@ -1370,19 +1320,24 @@ while true; do
         1) [ -d "/root/npm_data" ] && { echo -e "\n${YELLOW}网络水电总管已安装。${NC}"; sleep 2; } || install_npm ;;
         2) [ -d "/root/nextcloud_data" ] && { echo -e "\n${YELLOW}Nextcloud 套件已安装。${NC}"; sleep 2; } || install_nextcloud_suite ;;
         3) [ -d "/root/wordpress_data" ] && { echo -e "\n${YELLOW}WordPress 已安装。${NC}"; sleep 2; } || install_wordpress ;;
-        4) [ -d "/root/jellyfin_data" ] && { echo -e "\n${YELLOW}Jellyfin 已安装。${NC}"; sleep 2; } || install_jellyfin ;;
-        5) [ -d "/root/ai_stack" ] && { echo -e "\n${YELLOW}AI 大脑已安装。${NC}"; sleep 2; } || install_ai_suite ;;
-        6) install_support_fleet ;;
-        7) install_downloader_suite ;;
-        8) [ -f "/etc/fail2ban/jail.local" ] && { echo -e "\n${YELLOW}Fail2ban 已安装。${NC}"; sleep 2; } || install_fail2ban ;;
-        9) [ -f "/etc/xrdp/xrdp.ini" ] && { echo -e "\n${YELLOW}远程工作台已安装。${NC}"; sleep 2; } || install_desktop_env ;;
-        10) [ -f "/etc/msmtprc" ] && { echo -e "\n${YELLOW}邮件管家已安装。${NC}"; sleep 2; } || install_mail_reporter ;;
-        11) install_ai_model ;;
-        12) run_nextcloud_optimization ;;
-        13) show_service_control_panel ;;
-        14) show_credentials ;;
-        15) install_science_tools ;;
-        16) configure_rclone_engine ;;
+        4) [ -d "/root/ai_stack" ] && { echo -e "\n${YELLOW}AI 大脑已安装。${NC}"; sleep 2; } || install_ai_suite ;;
+        5) [ -d "/root/jellyfin_data" ] && { echo -e "\n${YELLOW}Jellyfin 已安装。${NC}"; sleep 2; } || install_jellyfin ;;
+        6) [ -d "/root/navidrome_data" ] && { echo -e "\n${YELLOW}Navidrome 已安装。${NC}"; sleep 2; } || install_navidrome ;;
+        7) [ -d "/root/alist_data" ] && { echo -e "\n${YELLOW}Alist 已安装。${NC}"; sleep 2; } || install_alist ;;
+        8) [ -d "/root/gitea_data" ] && { echo -e "\n${YELLOW}Gitea 已安装。${NC}"; sleep 2; } || install_gitea ;;
+        9) [ -d "/root/memos_data" ] && { echo -e "\n${YELLOW}Memos 已安装。${NC}"; sleep 2; } || install_memos ;;
+        10) [ -d "/root/qbittorrent_data" ] && { echo -e "\n${YELLOW}qBittorrent 已安装。${NC}"; sleep 2; } || install_qbittorrent ;;
+        11) [ -d "/root/jdownloader_data" ] && { echo -e "\n${YELLOW}JDownloader 已安装。${NC}"; sleep 2; } || install_jdownloader ;;
+        12) [ -d "/root/ytdlp_data" ] && { echo -e "\n${YELLOW}yt-dlp 已安装。${NC}"; sleep 2; } || install_ytdlp ;;
+        15) [ -f "/etc/fail2ban/jail.local" ] && { echo -e "\n${YELLOW}Fail2ban 已安装。${NC}"; sleep 2; } || install_fail2ban ;;
+        16) [ -f "/etc/xrdp/xrdp.ini" ] && { echo -e "\n${YELLOW}远程工作台已安装。${NC}"; sleep 2; } || install_desktop_env ;;
+        17) [ -f "/etc/msmtprc" ] && { echo -e "\n${YELLOW}邮件管家已安装。${NC}"; sleep 2; } || install_mail_reporter ;;
+        18) configure_rclone_engine ;;
+        21) install_ai_model ;;
+        22) run_nextcloud_optimization ;;
+        23) show_service_control_panel ;;
+        24) show_credentials ;;
+        25) install_science_tools ;;
         99) uninstall_everything ;;
         q|Q) echo -e "${BLUE}    装修愉快，房主再见！    ${NC}"; exit 0 ;;
         *) echo -e "${RED}    无效的选项，请重新输入。    ${NC}"; sleep 2 ;;
