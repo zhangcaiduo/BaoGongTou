@@ -213,14 +213,13 @@ echo -e "\n${YELLOW}     🚀     [1/3]     准备系统环境与     Docker...$
 sudo apt-get update
 sudo apt-get install -y ca-certificates curl gnupg
 if ! command -v docker &> /dev/null; then
-curl -fsSL https://get.docker.com -o get-docker.sh
-sudo sh get-docker.sh && rm get-docker.sh
-sudo systemctl restart docker
+    curl -fsSL https://get.docker.com -o get-docker.sh
+    sudo sh get-docker.sh && rm get-docker.sh
+    sudo systemctl restart docker
 fi
 echo -e "${GREEN}     ✅        系统环境与     Docker     已就绪！    ${NC}"
 
 echo -e "\n${YELLOW}     🚀     [2/3]     检查并安装核心工具     Docker-Compose...${NC}"
-# --- 新增：检查并安装 Docker Compose ---
 if ! command -v docker-compose &> /dev/null; then
     echo -e "\n${YELLOW}检测到系统缺少 docker-compose 工具，正在为您自动安装...${NC}"
     sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
@@ -238,25 +237,28 @@ fi
 echo -e "\n${YELLOW}     🚀     [3/3]     部署     NPM     并创建专属网络总线    ...${NC}"
 sudo docker network create npm_data_default || true
 mkdir -p /root/npm_data
+# 修正了 docker-compose.yml 的内容，去掉了重复的 networks 定义
 cat > /root/npm_data/docker-compose.yml <<'EOF'
+version: '3'
 services:
-app:
-image: 'jc21/nginx-proxy-manager:latest'
-container_name: npm_app
-restart: unless-stopped
-ports:
-- '80:80'
-- '443:443'
-- '81:81'
-volumes:
-- './data:/data'
-- './letsencrypt:/etc/letsencrypt'
+  app:
+    image: 'jc21/nginx-proxy-manager:latest'
+    container_name: npm_app
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+      - '81:81'
+    volumes:
+      - './data:/data'
+      - './letsencrypt:/etc/letsencrypt'
+    networks:
+      - npm_network
+
 networks:
-- npm_network
-networks:
-npm_network:
-name: npm_data_default
-external: true
+  npm_network:
+    name: npm_data_default
+    external: true
 EOF
 (cd /root/npm_data && sudo docker-compose up -d)
 echo -e "${GREEN}     ✅     网络水电总管 (NPM)     部署完毕！    ${NC}"
