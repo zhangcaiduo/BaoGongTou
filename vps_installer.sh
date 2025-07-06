@@ -242,7 +242,7 @@ npm_network:
 name: npm_data_default
 external: true
 EOF
-(cd /root/npm_data && sudo docker compose up -d)
+(cd /root/npm_data && sudo docker-compose up -d)
 echo -e "${GREEN}     ✅     网络水电总管 (NPM)     部署完毕！    ${NC}"
 echo -e "\n${GREEN}    按任意键返回主菜单    ...${NC}"; read -n 1 -s
 }
@@ -304,7 +304,7 @@ name: npm_data_default
 external: true
 EOF
 echo -e "opcache.memory_consumption=512\nopcache.interned_strings_buffer=16" > /root/nextcloud_data/php-opcache.ini
-(cd /root/nextcloud_data && sudo docker compose up -d)
+(cd /root/nextcloud_data && sudo docker-compose up -d)
 echo -e "${GREEN}     ✅        数据中心主体     (Nextcloud)     启动完毕！    ${NC}"
 
 mkdir -p /root/onlyoffice_data
@@ -327,7 +327,7 @@ npm_network:
 name: npm_data_default
 external: true
 EOF
-(cd /root/onlyoffice_data && sudo docker compose up -d)
+(cd /root/onlyoffice_data && sudo docker-compose up -d)
 echo -e "${GREEN}     ✅        在线办公室     (OnlyOffice)     部署完毕！    ${NC}"
 
 echo "##     Nextcloud 套件凭证     (    部署于    : $(date))" > ${STATE_FILE}
@@ -389,7 +389,7 @@ npm_network:
 name: npm_data_default
 external: true
 EOF
-(cd /root/wordpress_data && sudo docker compose up -d)
+(cd /root/wordpress_data && sudo docker-compose up -d)
 echo -e "${GREEN}     ✅     WordPress     已在后台启动！    ${NC}"
 
 echo -e "\n## WordPress     凭证     (    部署于    : $(date))" >> ${STATE_FILE}
@@ -425,7 +425,7 @@ npm_network:
 name: npm_data_default
 external: true
 EOF
-(cd /root/jellyfin_data && sudo docker compose up -d)
+(cd /root/jellyfin_data && sudo docker-compose up -d)
 echo -e "${GREEN}     ✅     Jellyfin     已在后台启动！    ${NC}"
 echo -e "\n${GREEN}===============     ✅     Jellyfin     部署完成        ✅     ===============${NC}"
 echo "    请在     NPM     中为您规划的域名配置代理，指向     ${BLUE}jellyfin_app:8096${NC}"
@@ -468,7 +468,7 @@ npm_network:
 name: npm_data_default
 external: true
 EOF
-(cd /root/ai_stack && sudo docker compose up -d)
+(cd /root/ai_stack && sudo docker-compose up -d)
 echo -e "${GREEN}     ✅     AI     核心已在后台启动！    ${NC}"
 echo -e "\n## AI     核心凭证     (    部署于    : $(date))" >> ${STATE_FILE}
 echo "AI_DOMAIN=${AI_DOMAIN}" >> ${STATE_FILE}
@@ -556,10 +556,10 @@ external: true
 EOF
 
 echo -e "\n${YELLOW}     🚀        正在启动所有工具箱组件    ...${NC}"
-(cd /root/alist_data && sudo docker compose up -d)
-(cd /root/gitea_data && sudo docker compose up -d)
-(cd /root/memos_data && sudo docker compose up -d)
-(cd /root/navidrome_data && sudo docker compose up -d)
+(cd /root/alist_data && sudo docker-compose up -d)
+(cd /root/gitea_data && sudo docker-compose up -d)
+(cd /root/memos_data && sudo docker-compose up -d)
+(cd /root/navidrome_data && sudo docker-compose up -d)
 echo -e "${GREEN}     ✅        所有工具箱组件已在后台启动！    ${NC}"
 
 echo -e "\n${GREEN}===============     ✅        家装工具箱部署完成        ✅     ===============${NC}"
@@ -635,7 +635,7 @@ npm_network:
 name: npm_data_default
 external: true
 EOF
-(cd /root/qbittorrent_data && sudo docker compose up -d)
+(cd /root/qbittorrent_data && sudo docker-compose up -d)
 echo -e "${GREEN}     ✅     qBittorrent     已启动！    ${NC}"
 fi
 if [[ "$component" == "jd" ]]; then
@@ -663,7 +663,7 @@ npm_network:
 name: npm_data_default
 external: true
 EOF
-(cd /root/jdownloader_data && sudo docker compose up -d)
+(cd /root/jdownloader_data && sudo docker-compose up -d)
 echo "JDOWNLOADER_VNC_PASSWORD=${JDOWNLOADER_PASS}" >> ${STATE_FILE}
 echo -e "${GREEN}     ✅     JDownloader     已启动！    VNC     密码已保存。    ${NC}"
 fi
@@ -690,7 +690,7 @@ npm_network:
 name: npm_data_default
 external: true
 EOF
-(cd /root/ytdlp_data && sudo docker compose up -d)
+(cd /root/ytdlp_data && sudo docker-compose up -d)
 echo "YTDL_DOMAIN=${YTDL_DOMAIN}" >> ${STATE_FILE}
 echo -e "${GREEN}     ✅     yt-dlp     已启动！    ${NC}"
 fi
@@ -926,7 +926,7 @@ for service_entry in "${services[@]}"; do
 local name=$(echo $service_entry | cut -d':' -f1)
 local path=$(echo $service_entry | cut -d':' -f2)
 if [ -f "${path}/docker-compose.yml" ]; then
-if sudo docker compose -f ${path}/docker-compose.yml ps -q 2>/dev/null | grep -q .; then
+if sudo docker-compose -f ${path}/docker-compose.yml ps -q 2>/dev/null | grep -q .; then
 status="${GREEN}[     运行中     ]${NC}"
 else
 status="${RED}[     已停止     ]${NC}"
@@ -959,10 +959,10 @@ echo "b)     返回    "
 read -p "    请选择操作    : " action_choice
 
 case $action_choice in
-1) (cd $s_path && sudo docker compose up -d); echo -e "${GREEN}${s_name}     已启动    !${NC}";;
-2) (cd $s_path && sudo docker compose stop); echo -e "${YELLOW}${s_name}     已停止    !${NC}";;
-3) (cd $s_path && sudo docker compose restart); echo -e "${CYAN}${s_name}     已重启    !${NC}";;
-4) sudo docker compose -f ${s_path}/docker-compose.yml logs -f --tail 50;;
+1) (cd $s_path && sudo docker-compose up -d); echo -e "${GREEN}${s_name}     已启动    !${NC}";;
+2) (cd $s_path && sudo docker-compose stop); echo -e "${YELLOW}${s_name}     已停止    !${NC}";;
+3) (cd $s_path && sudo docker-compose restart); echo -e "${CYAN}${s_name}     已重启    !${NC}";;
+4) sudo docker-compose -f ${s_path}/docker-compose.yml logs -f --tail 50;;
 b) continue;;
 *) echo -e "${RED}     无效操作    !${NC}";;
 esac
