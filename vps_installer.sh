@@ -149,8 +149,8 @@ show_main_menu() {
     check_and_display "3" " 部署 WordPress 个人博客" "/root/wordpress_data" "docker_nopm:wordpress_app"
     check_and_display "4" " 部署 Jellyfin 家庭影院" "/root/jellyfin_data" "docker:jellyfin_app:8096"
     check_and_display "5" " 部署 AI 大脑 (Ollama+WebUI)" "/root/ai_stack" "docker_nopm:open_webui_app"
-    check_and_display "6" " 部署家装工具箱 (Alist, Gitea)" "/root/alist_data" "multi_docker:Alist(5244),Gitea(3000)..."
-    check_and_display "7" " 部署下载工具集 (可选安装)" "/root/qbittorrent_data" "downloader"
+    check_and_display "6" " 部署(Alist,Gitea,memos,navidrome)" "/root/alist_data" "multi_docker:Alist(5244),Gitea(3000)..."
+    check_and_display "7" " 部署下载工具集 (qBittorrent,JDownloader,yt-dlp)" "/root/qbittorrent_data" "downloader"
 
     echo -e "  ${GREEN}---  安防与工具  ---${NC}"
     check_and_display "8" " 部署全屋安防系统 (Fail2ban)" "/etc/fail2ban/jail.local" "system"
