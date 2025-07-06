@@ -773,29 +773,42 @@ install_desktop_env() {
     clear
     echo -e "${BLUE}--- “远程工作台”建造计划启动！ ---${NC}";
     sleep 2
-    echo -e "\n${YELLOW}     🚀     [1/3]     正在安装核心桌面组件     (Xfce)...${NC}"
+    echo -e "\n${YELLOW}     🚀     [1/4]     正在安装核心桌面组件     (Xfce)...${NC}"
     export DEBIAN_FRONTEND=noninteractive
     sudo apt-get update
-    sudo apt-get install -y xfce4 xfce4-goodies
+    sudo apt-get install -y xfce4 xfce4-goodies -y
     echo -e "${GREEN}     ✅        核心桌面组件安装完毕！    ${NC}"
 
-    echo -e "\n${YELLOW}     🚀     [2/3]     正在安装远程连接服务     (XRDP)...${NC}"
+    echo -e "\n${YELLOW}     🚀     [2/4]     正在安装并加固远程连接服务     (XRDP)...${NC}"
     sudo apt-get install -y xrdp
+    
+    # --- 新增安全加固：禁止 root 登录 ---
+    if [ -f /etc/xrdp/sesman.ini ]; then
+        echo -e "${YELLOW}正在加固 XRDP，禁止 root 用户登录...${NC}"
+        sudo sed -i 's/AllowRootLogin=true/AllowRootLogin=false/g' /etc/xrdp/sesman.ini
+    fi
+    # --- 安全加固结束 ---
+
     sudo systemctl enable --now xrdp
     echo xfce4-session > ~/.xsession
     sudo adduser xrdp ssl-cert
     sudo systemctl restart xrdp
     echo -e "${GREEN}     ✅        远程连接服务安装并启动完毕！    ${NC}"
 
-    echo -e "\n${YELLOW}     🚀     [3/3]     正在创建您的专属工作台账户    ...${NC}"
+    echo -e "\n${YELLOW}     🚀     [3/4]     正在创建您的专属工作台账户    ...${NC}"
     read -p "    请输入您想创建的新用户名     (    例如     zhangcaiduo): " NEW_USER
     if [ -z "$NEW_USER" ]; then echo -e "${RED}     用户名不能为空，操作取消。    ${NC}"; sleep 2; return; fi
     sudo adduser --gecos "" "$NEW_USER"
     echo -e "${GREEN}     ✅        专属账户     '$NEW_USER'     创建成功！    ${NC}"
 
+    echo -e "\n${YELLOW}     🚀     [4/4]     请为新账户 '$NEW_USER' 设置登录密码...${NC}"
+    # --- 新增：强制为新用户设置密码 ---
+    sudo passwd "$NEW_USER"
+    # --- 密码设置结束 ---
+
     echo -e "\n${GREEN}===============     ✅        远程工作台建造完毕！        ✅     ===============${NC}"
     echo "    请使用您电脑的“远程桌面连接”工具，连接到您的服务器     IP    。    "
-    echo "    在登录界面，请使用您刚刚创建的【用户名】和【密码】。    "
+    echo -e "    ${YELLOW}在登录界面，请使用您刚刚创建的【用户名】和【新密码】。${NC}"
     echo -e "\n${GREEN}    按任意键返回主菜单    ...${NC}"; read -n 1 -s
 }
 
