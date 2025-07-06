@@ -1,4 +1,4 @@
-# 張財多制作的 VPS 包工头面板 - 一键装修你的VPS
+# 張財多的 VPS 包工头面板 - 一键装修你的VPS
 
 [![作者](https://img.shields.io/badge/作者-zhangcaiduo-blue.svg)](https://github.com/zhangcaiduo)
 [![版本](https://img.shields.io/badge/版本-v6.5.1-brightgreen.svg)](https://github.com/zhangcaiduo/vps-installer-script)
