@@ -25,7 +25,7 @@
 用SSH登录到你的VPS后，只需复制并执行下面这一行命令，即可召唤“包工头面板”：
 
 ```bash
-wget -O zhangcaiduo.sh '[https://raw.githubusercontent.com/zhangcaiduo/BaoGongTou/main/vps_installer.sh](https://raw.githubusercontent.com/zhangcaiduo/BaoGongTou/main/vps_installer.sh)' && sudo bash zhangcaiduo.sh
+wget -O vps_installer.sh 'https://raw.githubusercontent.com/zhangcaiduo/BaoGongTou/refs/heads/main/vps_installer.sh' && sudo bash vps_installer.sh
 ```
 
 **友情提示**:
