@@ -1,9 +1,11 @@
 #!/bin/bash
 #================================================================
-# “    VPS 从零开始装修面板    ” v6.6.0 -    终极稳定 & 语法修正版
-#    1.   全面修正所有 docker-compose.yml 的 YAML 语法，增加 version: '3' 并优化结构。
-#    2.   统一所有部署命令，确保兼容性。
-#    3.   优化了 NPM 安装流程，集成了 docker-compose 的智能安装。
+# “    VPS 从零开始装修面板    ” v6.7.0 -    交互优化 & 功能增强版
+#    1.   全面对齐主菜单，视觉更统一。
+#    2.   重写“一键还原毛坯”功能，实现无残留彻底清除。
+#    3.   重构选项 6 和 7 的安装逻辑，改为逐项选择、按需安装，交互更友好。
+#    4.   新增“虚拟内存”管理功能，为低配VPS提供性能优化选项。
+#    5.   统一所有部署命令，确保兼容性。
 #     作者     : 張財多 zhangcaiduo.com
 #================================================================
 
@@ -67,6 +69,49 @@ run_unminimize() {
     echo -e "\n${GREEN} 按任意键返回主菜单 ...${NC}"; read -n 1 -s
 }
 
+# ---     新增：Swap管理功能     ---
+manage_swap() {
+    clear
+    echo -e "${BLUE}---  配置虚拟内存 (Swap) ---${NC}"
+    if swapon --show | grep -q '/swapfile'; then
+        echo -e "${YELLOW} 检测到已存在 /swapfile 虚拟内存。${NC}"
+        read -p " 您想移除现有的虚拟内存吗? (y/n): " confirm_remove
+        if [[ "$confirm_remove" == "y" || "$confirm_remove" == "Y" ]]; then
+            echo -e "${YELLOW} 正在停止并移除虚拟内存...${NC}"
+            sudo swapoff /swapfile
+            sudo sed -i '/\/swapfile/d' /etc/fstab
+            sudo rm -f /swapfile
+            echo -e "${GREEN} ✅  虚拟内存已成功移除！${NC}"
+            free -h
+        else
+            echo -e "${GREEN} 操作已取消。${NC}"
+        fi
+    else
+        echo -e "${YELLOW} 未检测到虚拟内存。现在为您创建。${NC}"
+        read -p " 请输入您期望的 Swap 大小 (例如: 4G, 8G, 10G) [建议为内存的1-2倍]: " swap_size
+        if [ -z "$swap_size" ]; then
+            echo -e "${RED} 输入为空，操作取消。${NC}"; sleep 2; return
+        fi
+        echo -e "${YELLOW} 🚀  [1/5] 正在创建 ${swap_size} 大小的交换文件...${NC}"
+        sudo fallocate -l ${swap_size} /swapfile
+        echo -e "${YELLOW} 🚀  [2/5] 正在设置文件权限...${NC}"
+        sudo chmod 600 /swapfile
+        echo -e "${YELLOW} 🚀  [3/5] 正在将文件格式化为 Swap...${NC}"
+        sudo mkswap /swapfile
+        echo -e "${YELLOW} 🚀  [4/5] 正在启用 Swap 文件...${NC}"
+        sudo swapon /swapfile
+        echo -e "${YELLOW} 🚀  [5/5] 正在设置开机自动挂载...${NC}"
+        if ! grep -q "/swapfile" /etc/fstab; then
+            sudo cp /etc/fstab /etc/fstab.bak
+            echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+        fi
+        echo -e "\n${GREEN} ✅  虚拟内存创建并启用成功！${NC}"
+        echo -e "${CYAN} 当前内存和虚拟内存状态:${NC}"
+        free -h
+    fi
+    echo -e "\n${GREEN} 按任意键返回主菜单 ...${NC}"; read -n 1 -s
+}
+
 
 # ---     检查函数  ---
 check_and_display() {
@@ -82,6 +127,14 @@ check_and_display() {
             check_path=""
         else
             check_path="/root/qbittorrent_data"
+        fi
+    fi
+    
+    if [[ "$status_info" == "support_fleet" ]]; then
+        if [ ! -d "/root/alist_data" ] && [ ! -d "/root/gitea_data" ] && [ ! -d "/root/memos_data" ] && [ ! -d "/root/navidrome_data" ]; then
+            check_path=""
+        else
+            check_path="/root/alist_data"
         fi
     fi
 
@@ -106,6 +159,14 @@ check_and_display() {
                 [ -d "/root/ytdlp_data" ] && tools+="yt-dlp"
                 formatted_details=" 已装 : $(echo "$tools" | sed 's/ *$//g' | sed 's/ /, /g')"
                 ;;
+            support_fleet)
+                local tools=""
+                [ -d "/root/alist_data" ] && tools+="Alist "
+                [ -d "/root/gitea_data" ] && tools+="Gitea "
+                [ -d "/root/memos_data" ] && tools+="Memos "
+                [ -d "/root/navidrome_data" ] && tools+="Navidrome"
+                formatted_details=" 已装 : $(echo "$tools" | sed 's/ *$//g' | sed 's/ /, /g')"
+                ;;
             system) formatted_details=" 系统服务 ";;
             system_port) formatted_details=" 服务端口 : ${details}";;
             rclone)
@@ -116,7 +177,7 @@ check_and_display() {
         esac
         status_string="[ ✅ ${formatted_details}]"
     fi
-    printf "  %-40s\t%s\n" "${display_text}" "${status_string}"
+    printf "  %-55s %s\n" "${display_text}" "${status_string}"
 }
 
 # ---     菜单函数 ---
@@ -132,7 +193,7 @@ show_main_menu() {
                                            zhangcaiduo.com
 "
 
-    echo -e "${GREEN}============ VPS 从毛坯房开始装修VPS 包工头面板 v6.6.0 ============================================${NC}"
+    echo -e "${GREEN}============ VPS 从毛坯房开始装修VPS 包工头面板 v6.7.0 ============================================${NC}"
     echo -e "${BLUE}本脚本适用于 Ubuntu 和 Debian 系统的项目部署 ${NC}"
     echo -e "${BLUE}本脚本由小白出于学习与爱好制作，欢迎交流 ${NC}"
     echo -e "${BLUE}本脚本不具任何商业盈利，纯属学习不承担任何法律后果 ${NC}"
@@ -140,8 +201,10 @@ show_main_menu() {
     echo -e "${BLUE}=========================================================================================${NC}"
 
     echo -e "  ${GREEN}---  地基与系统  ---${NC}"
-    printf "  %-40s\t%s\n" "u)  更新系统与软件" "[ apt update && upgrade ]"
-    printf "  %-40s\t%s\n" "m)  恢复至标准系统" "[ unminimize, 仅限 Ubuntu 系统 ]"
+    printf "  %-55s %s\n" "u)  更新系统与软件" "[ apt update && upgrade ]"
+    printf "  %-55s %s\n" "m)  恢复至标准系统" "[ unminimize, 仅限 Ubuntu 系统 ]"
+    printf "  %-55s %s\n" "s)  配置虚拟内存 (Swap)" "[ 增强低配VPS性能 ]"
+
 
     echo -e "  ${GREEN}---  主体装修选项  ---${NC}"
     check_and_display "1" " 部署网络水电总管 (NPM)" "/root/npm_data" "docker:npm_app:81"
@@ -149,8 +212,8 @@ show_main_menu() {
     check_and_display "3" " 部署 WordPress 个人博客" "/root/wordpress_data" "docker_nopm:wordpress_app"
     check_and_display "4" " 部署 Jellyfin 家庭影院" "/root/jellyfin_data" "docker:jellyfin_app:8096"
     check_and_display "5" " 部署 AI 大脑 (Ollama+WebUI)" "/root/ai_stack" "docker_nopm:open_webui_app"
-    check_and_display "6" " 部署(Alist,Gitea,memos,navidrome)" "/root/alist_data" "multi_docker:Alist(5244),Gitea(3000)..."
-    check_and_display "7" " 部署下载工具集 (qBittorrent,JDownloader,yt-dlp)" "/root/qbittorrent_data" "downloader"
+    check_and_display "6" " 部署家装工具箱 (Alist,Gitea,memos...)" "/root/alist_data" "support_fleet"
+    check_and_display "7" " 部署下载工具集 (qBittorrent,JDownloader...)" "/root/qbittorrent_data" "downloader"
 
     echo -e "  ${GREEN}---  安防与工具  ---${NC}"
     check_and_display "8" " 部署全屋安防系统 (Fail2ban)" "/etc/fail2ban/jail.local" "system"
@@ -159,15 +222,15 @@ show_main_menu() {
     check_and_display "16" " 配置 Rclone 数据同步桥" "${RCLONE_CONFIG_FILE}" "rclone"
 
     echo -e "  ${GREEN}---  高级功能与维护  ---${NC}"
-    printf "  %-40s\n" "11) 为 AI 大脑安装知识库 (安装模型)"
-    printf "  %-40s\n" "12) 执行 Nextcloud 最终性能优化"
-    printf "  %-40s\t%s\n" "13) ${CYAN}进入服务控制中心${NC}" "(启停/重启服务)"
-    printf "  %-40s\t%s\n" "14) ${CYAN}查看密码与数据路径${NC}" "(重要凭证)"
-    printf "  %-40s\t%s\n" "15) ${RED}打开“科学”工具箱${NC}" "(Warp, Argo, OpenVPN)"
+    printf "  %-55s\n" "11) 为 AI 大脑安装知识库 (安装模型)"
+    printf "  %-55s\n" "12) 执行 Nextcloud 最终性能优化"
+    printf "  %-55s %s\n" "13) ${CYAN}进入服务控制中心${NC}" "[ 启停/重启服务 ]"
+    printf "  %-55s %s\n" "14) ${CYAN}查看密码与数据路径${NC}" "[ 重要凭证 ]"
+    printf "  %-55s %s\n" "15) ${RED}打开“科学”工具箱${NC}" "[ Warp, Argo, OpenVPN ]"
 
-    echo -e "  ----------------------------------------------------------"
-    printf "  %-40s\t%s\n" "99) ${RED}一键还原毛坯${NC}" "(卸载所有服务)"
-    printf "  %-40s\t%s\n" "q)  退出面板" ""
+    echo -e "  ----------------------------------------------------------------------------------------"
+    printf "  %-55s %s\n" "99) ${RED}一键还原毛坯${NC}" "[ 卸载所有服务 ]"
+    printf "  %-55s %s\n" "q)  退出面板" ""
     echo -e "${GREEN}===================================================================================================${NC}"
 }
 
@@ -484,16 +547,35 @@ EOF
     install_ai_model
 }
 
-# 6.     家装工具箱
+# 6.     家装工具箱 (交互重构)
 install_support_fleet() {
     check_npm_installed || return
-    clear
-    echo -e "${BLUE}--- “家装工具箱”安装计划启动！ ---${NC}";
-    sleep 2
+    while true; do
+        clear
+        echo -e "${BLUE}--- “家装工具箱”按需安装 ---${NC}"
+        echo "    请选择要安装的工具 (输入数字安装，或 'b' 返回):"
+        
+        [ -d "/root/alist_data" ] && alist_status="${GREEN}[ ✅  已安装 ]${NC}" || alist_status=""
+        [ -d "/root/gitea_data" ] && gitea_status="${GREEN}[ ✅  已安装 ]${NC}" || gitea_status=""
+        [ -d "/root/memos_data" ] && memos_status="${GREEN}[ ✅  已安装 ]${NC}" || memos_status=""
+        [ -d "/root/navidrome_data" ] && navidrome_status="${GREEN}[ ✅  已安装 ]${NC}" || navidrome_status=""
 
-    # Alist
-    mkdir -p /root/alist_data
-    cat >/root/alist_data/docker-compose.yml <<'EOF'
+        printf "  1) Alist (网盘挂载) %s\n" "$alist_status"
+        printf "  2) Gitea (代码仓库) %s\n" "$gitea_status"
+        printf "  3) Memos (轻量笔记) %s\n" "$memos_status"
+        printf "  4) Navidrome (音乐服务器) %s\n" "$navidrome_status"
+        echo "------------------------------------"
+        echo "  b) 返回主菜单"
+        read -p "    请输入您的选择: " tool_choice
+
+        case $tool_choice in
+            1)
+                if [ -d "/root/alist_data" ]; then
+                    echo -e "${YELLOW}Alist 已安装。${NC}"; sleep 2; continue
+                fi
+                echo -e "\n${YELLOW}     🚀        部署 Alist...${NC}"
+                mkdir -p /root/alist_data
+                cat >/root/alist_data/docker-compose.yml <<'EOF'
 version: '3.8'
 services:
   alist:
@@ -504,16 +586,23 @@ services:
       - './data:/opt/alist/data'
     networks:
       - npm_network
-
 networks:
   npm_network:
     name: npm_data_default
     external: true
 EOF
-
-    # Gitea
-    mkdir -p /root/gitea_data
-    cat >/root/gitea_data/docker-compose.yml <<'EOF'
+                (cd /root/alist_data && sudo docker-compose up -d)
+                echo -e "${GREEN} ✅  Alist 已启动！内部端口: 5244 ${NC}"
+                echo -e "${CYAN} 请使用以下命令查看初始密码: sudo docker exec alist_app ./alist admin ${NC}"
+                sleep 5
+                ;;
+            2)
+                if [ -d "/root/gitea_data" ]; then
+                    echo -e "${YELLOW}Gitea 已安装。${NC}"; sleep 2; continue
+                fi
+                echo -e "\n${YELLOW}     🚀        部署 Gitea...${NC}"
+                mkdir -p /root/gitea_data
+                cat >/root/gitea_data/docker-compose.yml <<'EOF'
 version: '3.8'
 services:
   server:
@@ -529,16 +618,21 @@ services:
       - '/etc/localtime:/etc/localtime:ro'
     networks:
       - npm_network
-
 networks:
   npm_network:
     name: npm_data_default
     external: true
 EOF
-
-    # Memos
-    mkdir -p /root/memos_data
-    cat >/root/memos_data/docker-compose.yml <<'EOF'
+                (cd /root/gitea_data && sudo docker-compose up -d)
+                echo -e "${GREEN} ✅  Gitea 已启动！内部端口: 3000 ${NC}"; sleep 3
+                ;;
+            3)
+                if [ -d "/root/memos_data" ]; then
+                    echo -e "${YELLOW}Memos 已安装。${NC}"; sleep 2; continue
+                fi
+                echo -e "\n${YELLOW}     🚀        部署 Memos...${NC}"
+                mkdir -p /root/memos_data
+                cat >/root/memos_data/docker-compose.yml <<'EOF'
 version: '3.8'
 services:
   memos:
@@ -549,16 +643,21 @@ services:
       - './data:/var/opt/memos'
     networks:
       - npm_network
-
 networks:
   npm_network:
     name: npm_data_default
     external: true
 EOF
-
-    # Navidrome
-    mkdir -p /root/navidrome_data /mnt/Music
-    cat > /root/navidrome_data/docker-compose.yml <<'EOF'
+                (cd /root/memos_data && sudo docker-compose up -d)
+                echo -e "${GREEN} ✅  Memos 已启动！内部端口: 5230 ${NC}"; sleep 3
+                ;;
+            4)
+                if [ -d "/root/navidrome_data" ]; then
+                    echo -e "${YELLOW}Navidrome 已安装。${NC}"; sleep 2; continue
+                fi
+                echo -e "\n${YELLOW}     🚀        部署 Navidrome...${NC}"
+                mkdir -p /root/navidrome_data /mnt/Music
+                cat > /root/navidrome_data/docker-compose.yml <<'EOF'
 version: '3.8'
 services:
   navidrome:
@@ -573,68 +672,50 @@ services:
       - 'TZ=Asia/Shanghai'
     networks:
       - npm_network
-
 networks:
   npm_network:
     name: npm_data_default
     external: true
 EOF
-
-    echo -e "\n${YELLOW}     🚀        正在启动所有工具箱组件    ...${NC}"
-    (cd /root/alist_data && sudo docker-compose up -d)
-    (cd /root/gitea_data && sudo docker-compose up -d)
-    (cd /root/memos_data && sudo docker-compose up -d)
-    (cd /root/navidrome_data && sudo docker-compose up -d)
-    echo -e "${GREEN}     ✅        所有工具箱组件已在后台启动！    ${NC}"
-
-    echo -e "\n${GREEN}===============     ✅        家装工具箱部署完成        ✅     ===============${NC}"
-    echo "      内部端口参考    : Alist(5244), Gitea(3000), Memos(5230), Navidrome(4533)"
-    echo -e "  Alist     初始密码    : ${YELLOW}sudo docker exec alist_app ./alist admin${NC}"
-    echo -e "\n${GREEN}    按任意键返回主菜单    ...${NC}"; read -n 1 -s
-}
-
-# 7.     下载工具集
-install_downloader_suite() {
-    check_npm_installed || return
-    local components_to_install=()
-    while true; do
-        clear
-        echo -e "${BLUE}--- “下载工具集”部署计划 (可选安装) ---${NC}"
-        echo "    请选择要安装的下载工具     (    可多选，输入数字选择，再次输入取消    ):"
-        
-        [[ " ${components_to_install[@]} " =~ " qb " ]] && qb_status="${GREEN}[     已选     ]${NC}" || qb_status=""
-        [[ " ${components_to_install[@]} " =~ " jd " ]] && jd_status="${GREEN}[     已选     ]${NC}" || jd_status=""
-        [[ " ${components_to_install[@]} " =~ " yt " ]] && yt_status="${GREEN}[     已选     ]${NC}" || yt_status=""
-
-        echo "1) qBittorrent (    稳定版    ) $qb_status"
-        echo "2) JDownloader (    带密码    ) $jd_status"
-        echo "3) yt-dlp (    视频下载    ) $yt_status"
-        echo "------------------------------------"
-        echo "s)     开始安装已选工具    "
-        echo "b)     返回主菜单    "
-        read -p "    请输入您的选择    : " downloader_choice
-
-        case $downloader_choice in
-            1) [[ " ${components_to_install[@]} " =~ " qb " ]] && components_to_install=(${components_to_install[@]/qb/}) || components_to_install+=("qb");;
-            2) [[ " ${components_to_install[@]} " =~ " jd " ]] && components_to_install=(${components_to_install[@]/jd/}) || components_to_install+=("jd");;
-            3) [[ " ${components_to_install[@]} " =~ " yt " ]] && components_to_install=(${components_to_install[@]/yt/}) || components_to_install+=("yt");;
-            s) break;;
-            b) return;;
-            *) echo -e "${RED}     无效选择    !${NC}"; sleep 1;;
+                (cd /root/navidrome_data && sudo docker-compose up -d)
+                echo -e "${GREEN} ✅  Navidrome 已启动！内部端口: 4533. 媒体库: /mnt/Music ${NC}"; sleep 3
+                ;;
+            b|B)
+                echo -e "${GREEN}返回主菜单...${NC}"; sleep 1; break ;;
+            *)
+                echo -e "${RED} 无效选择!${NC}"; sleep 1 ;;
         esac
     done
+}
 
-    if [ ${#components_to_install[@]} -eq 0 ]; then echo -e "${YELLOW}     您没有选择任何工具，操作取消。    ${NC}"; sleep 2; return; fi
 
-    clear
-    echo -e "${BLUE}---     开始部署已选下载工具     ---${NC}"; sleep 2
-    mkdir -p /mnt/Downloads
+# 7.     下载工具集 (交互重构)
+install_downloader_suite() {
+    check_npm_installed || return
+    while true; do
+        clear
+        echo -e "${BLUE}--- “下载工具集”按需安装 ---${NC}"
+        echo "    请选择要安装的下载工具 (输入数字安装，或 'b' 返回):"
+        
+        [ -d "/root/qbittorrent_data" ] && qb_status="${GREEN}[ ✅  已安装 ]${NC}" || qb_status=""
+        [ -d "/root/jdownloader_data" ] && jd_status="${GREEN}[ ✅  已安装 ]${NC}" || jd_status=""
+        [ -d "/root/ytdlp_data" ] && yt_status="${GREEN}[ ✅  已安装 ]${NC}" || yt_status=""
 
-    for component in "${components_to_install[@]}"; do
-        if [[ "$component" == "qb" ]]; then
-            echo -e "\n${YELLOW}     🚀        部署     qBittorrent...${NC}"
-            mkdir -p /root/qbittorrent_data
-            cat > /root/qbittorrent_data/docker-compose.yml <<'EOF'
+        printf "  1) qBittorrent (稳定版) %s\n" "$qb_status"
+        printf "  2) JDownloader (带密码) %s\n" "$jd_status"
+        printf "  3) yt-dlp (视频下载) %s\n" "$yt_status"
+        echo "------------------------------------"
+        echo "  b) 返回主菜单"
+        read -p "    请输入您的选择: " downloader_choice
+
+        case $downloader_choice in
+            1)
+                if [ -d "/root/qbittorrent_data" ]; then
+                    echo -e "${YELLOW}qBittorrent 已安装。${NC}"; sleep 2; continue
+                fi
+                echo -e "\n${YELLOW}     🚀        部署 qBittorrent...${NC}"
+                mkdir -p /root/qbittorrent_data /mnt/Downloads
+                cat > /root/qbittorrent_data/docker-compose.yml <<'EOF'
 version: '3.8'
 services:
   qbittorrent:
@@ -651,20 +732,22 @@ services:
       - '/mnt/Downloads:/downloads'
     networks:
       - npm_network
-
 networks:
   npm_network:
     name: npm_data_default
     external: true
 EOF
-            (cd /root/qbittorrent_data && sudo docker-compose up -d)
-            echo -e "${GREEN}     ✅     qBittorrent     已启动！    ${NC}"
-        fi
-        if [[ "$component" == "jd" ]]; then
-            echo -e "\n${YELLOW}     🚀        部署     JDownloader...${NC}"
-            JDOWNLOADER_PASS="VNC-Pass-$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 8)"
-            mkdir -p /root/jdownloader_data
-            cat > /root/jdownloader_data/docker-compose.yml <<EOF
+                (cd /root/qbittorrent_data && sudo docker-compose up -d)
+                echo -e "${GREEN} ✅  qBittorrent 已启动！内部端口: 8080, 下载目录: /mnt/Downloads ${NC}"; sleep 4
+                ;;
+            2)
+                if [ -d "/root/jdownloader_data" ]; then
+                    echo -e "${YELLOW}JDownloader 已安装。${NC}"; sleep 2; continue
+                fi
+                echo -e "\n${YELLOW}     🚀        部署 JDownloader...${NC}"
+                JDOWNLOADER_PASS="VNC-Pass-$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 8)"
+                mkdir -p /root/jdownloader_data /mnt/Downloads
+                cat > /root/jdownloader_data/docker-compose.yml <<EOF
 version: '3.8'
 services:
   jdownloader-2:
@@ -681,22 +764,24 @@ services:
       - '/mnt/Downloads:/output'
     networks:
       - npm_network
-
 networks:
   npm_network:
     name: npm_data_default
     external: true
 EOF
-            (cd /root/jdownloader_data && sudo docker-compose up -d)
-            echo "JDOWNLOADER_VNC_PASSWORD=${JDOWNLOADER_PASS}" >> ${STATE_FILE}
-            echo -e "${GREEN}     ✅     JDownloader     已启动！    VNC     密码已保存。    ${NC}"
-        fi
-        if [[ "$component" == "yt" ]]; then
-            echo -e "\n${YELLOW}     🚀        部署     yt-dlp...${NC}"
-            read -p "    请输入您为     yt-dlp     规划的子域名     (    例如     ytdl.zhangcaiduo.com): " YTDL_DOMAIN
-            if [ -z "$YTDL_DOMAIN" ]; then echo -e "${RED}yt-dlp     域名不能为空，跳过安装。    ${NC}"; continue; fi
-            mkdir -p /root/ytdlp_data
-            cat > /root/ytdlp_data/docker-compose.yml <<EOF
+                (cd /root/jdownloader_data && sudo docker-compose up -d)
+                echo "JDOWNLOADER_VNC_PASSWORD=${JDOWNLOADER_PASS}" >> ${STATE_FILE}
+                echo -e "${GREEN} ✅  JDownloader 已启动！VNC 密码 ${JDOWNLOADER_PASS} 已保存。内部端口 5800 ${NC}"; sleep 4
+                ;;
+            3)
+                if [ -d "/root/ytdlp_data" ]; then
+                    echo -e "${YELLOW}yt-dlp 已安装。${NC}"; sleep 2; continue
+                fi
+                read -p "    请输入您为 yt-dlp 规划的子域名 (例如 ytdl.zhangcaiduo.com): " YTDL_DOMAIN
+                if [ -z "$YTDL_DOMAIN" ]; then echo -e "${RED}yt-dlp 域名不能为空，跳过安装。${NC}"; sleep 2; continue; fi
+                echo -e "\n${YELLOW}     🚀        部署 yt-dlp...${NC}"
+                mkdir -p /root/ytdlp_data /mnt/Downloads
+                cat > /root/ytdlp_data/docker-compose.yml <<EOF
 version: '3.8'
 services:
   ytdlp-ui:
@@ -710,22 +795,23 @@ services:
       - './config:/app/config'
     networks:
       - npm_network
-
 networks:
   npm_network:
     name: npm_data_default
     external: true
 EOF
-            (cd /root/ytdlp_data && sudo docker-compose up -d)
-            echo "YTDL_DOMAIN=${YTDL_DOMAIN}" >> ${STATE_FILE}
-            echo -e "${GREEN}     ✅     yt-dlp     已启动！    ${NC}"
-        fi
+                (cd /root/ytdlp_data && sudo docker-compose up -d)
+                echo "YTDL_DOMAIN=${YTDL_DOMAIN}" >> ${STATE_FILE}
+                echo -e "${GREEN} ✅  yt-dlp 已启动！内部端口 8080。请配置NPM反代到 ytdlp_app:8080 ${NC}"; sleep 4
+                ;;
+            b|B)
+                echo -e "${GREEN}返回主菜单...${NC}"; sleep 1; break ;;
+            *)
+                echo -e "${RED} 无效选择!${NC}"; sleep 1 ;;
+        esac
     done
-
-    echo -e "\n${GREEN}=============     ✅        下载工具集部署完成        ✅     =============${NC}"
-    echo "    请根据您安装的服务，在     NPM     中完成代理配置。    "
-    echo -e "\n${GREEN}    按任意键返回主菜单    ...${NC}"; read -n 1 -s
 }
+
 
 # 8. Fail2ban
 install_fail2ban() {
@@ -781,12 +867,10 @@ install_desktop_env() {
     echo -e "\n${YELLOW}     🚀     [2/4]     正在安装并加固远程连接服务     (XRDP)...${NC}"
     sudo apt-get install -y xrdp
     
-    # --- 新增安全加固：禁止 root 登录 ---
     if [ -f /etc/xrdp/sesman.ini ]; then
         echo -e "${YELLOW}正在加固 XRDP，禁止 root 用户登录...${NC}"
         sudo sed -i 's/AllowRootLogin=true/AllowRootLogin=false/g' /etc/xrdp/sesman.ini
     fi
-    # --- 安全加固结束 ---
 
     sudo systemctl enable --now xrdp
     echo xfce4-session > ~/.xsession
@@ -798,12 +882,11 @@ install_desktop_env() {
     read -p "    请输入您想创建的新用户名     (    例如     zhangcaiduo): " NEW_USER
     if [ -z "$NEW_USER" ]; then echo -e "${RED}     用户名不能为空，操作取消。    ${NC}"; sleep 2; return; fi
     sudo adduser --gecos "" "$NEW_USER"
+    echo "DESKTOP_USER=${NEW_USER}" >> ${STATE_FILE} # 保存用户名用于卸载
     echo -e "${GREEN}     ✅        专属账户     '$NEW_USER'     创建成功！    ${NC}"
 
     echo -e "\n${YELLOW}     🚀     [4/4]     请为新账户 '$NEW_USER' 设置登录密码...${NC}"
-    # --- 新增：强制为新用户设置密码 ---
     sudo passwd "$NEW_USER"
-    # --- 密码设置结束 ---
 
     echo -e "\n${GREEN}===============     ✅        远程工作台建造完毕！        ✅     ===============${NC}"
     echo "    请使用您电脑的“远程桌面连接”工具，连接到您的服务器     IP    。    "
@@ -1021,7 +1104,7 @@ show_credentials() {
         echo "       数据库主机    : nextcloud_db"
         echo ""
     fi
-    grep -v "DB_PASSWORD" "${STATE_FILE}" | sed 's/^/  /'
+    grep -v -e "DB_PASSWORD" -e "DESKTOP_USER" "${STATE_FILE}" | sed 's/^/  /'
     echo -e "${NC}"
 
     echo -e "\n${CYAN}---     应用数据目录     (    用于上传文件    ) ---${NC}"
@@ -1185,13 +1268,12 @@ EOF
 }
 
 
-# 99.     一键还原毛坯
+# 99.     一键还原毛坯 (功能重写)
 uninstall_everything() {
     clear
     echo -e "${RED}====================     【！！！警告！！！】     ====================${NC}"
     echo -e "${YELLOW}    此操作将【不可逆转地】删除此面板安装的所有服务和数据！    ${NC}"
-    echo "    包括所有的     Docker     容器、数据卷、配置文件和密码记录。    "
-    echo "    您的服务器将恢复到运行此面板之前的状态（系统本身和脚本文件除外）。    "
+    echo "    包括所有的 Docker 容器、镜像、数据卷、网络、配置文件和密码记录。"
     echo -e "${RED}    请在执行前三思，并确保您已备份所有重要数据！    ${NC}"
     echo -e "----------------------------------------------------------"
     read -p "    为确认执行此毁灭性操作，请输入【    yEs-i-aM-sUrE    】    : " confirmation
@@ -1202,42 +1284,55 @@ uninstall_everything() {
     echo -e "\n${RED}     最终确认通过    ...     开始执行全屋拆除程序    ...${NC}";
     sleep 3
 
-    echo -e "\n${YELLOW}     🚀     [1/4]     正在停止并移除所有     Docker     容器    ...${NC}"
-    if [ -n "$(sudo docker ps -a -q)" ]; then
-        sudo docker stop $(sudo docker ps -a -q)
-        sudo docker rm $(sudo docker ps -a -q)
+    echo -e "\n${YELLOW}     🚀     [1/5]     正在进行 Docker 系统级清理 (容器, 镜像, 数据卷, 网络)...${NC}"
+    if command -v docker &> /dev/null; then
+      sudo docker system prune -a --volumes -f
     fi
-    echo -e "${GREEN}     ✅        所有容器已移除。    ${NC}"
+    echo -e "${GREEN}     ✅     Docker 环境已彻底清理。    ${NC}"
 
-    echo -e "\n${YELLOW}     🚀     [2/4]     正在清理所有服务的数据和配置文件夹    ...${NC}"
+    echo -e "\n${YELLOW}     🚀     [2/5]     正在清理所有服务的数据和配置文件夹    ...${NC}"
     sudo rm -rf /root/npm_data /root/nextcloud_data /root/onlyoffice_data /root/wordpress_data \
         /root/jellyfin_data /root/ai_stack /root/alist_data /root/gitea_data \
         /root/memos_data /root/navidrome_data /root/qbittorrent_data \
-        /root/jdownloader_data /root/ytdlp_data
+        /root/jdownloader_data /root/ytdlp_data /root/.config/rclone
     sudo umount /mnt/* >/dev/null 2>&1
     sudo rm -rf /mnt/*
-    echo -e "${GREEN}     ✅        所有数据文件夹已清理。    ${NC}"
+    echo -e "${GREEN}     ✅     所有数据文件夹已清理。    ${NC}"
 
-    echo -e "\n${YELLOW}     🚀     [3/4]     正在卸载系统级工具和配置    ...${NC}"
+    echo -e "\n${YELLOW}     🚀     [3/5]     正在卸载系统级工具和配置    ...${NC}"
+    # 卸载Rclone服务
     for service in $(ls /etc/systemd/system/rclone-*.service 2>/dev/null); do
         sudo systemctl stop $(basename ${service})
         sudo systemctl disable $(basename ${service})
         sudo rm -f ${service}
     done
     sudo systemctl daemon-reload
-    sudo rm -rf /root/.config/rclone
-    sudo rm -f ${RCLONE_LOG_FILE}
-    sudo systemctl stop fail2ban &>/dev/null
+    # 卸载邮件报告
+    (crontab -l 2>/dev/null | grep -v "/usr/local/bin/daily_server_report.sh") | crontab -
+    sudo apt-get purge -y s-nail msmtp vnstat &>/dev/null
+    sudo rm -f /etc/msmtprc /etc/s-nail.rc /usr/local/bin/daily_server_report.sh
+    # 卸载Fail2ban
     sudo apt-get purge -y fail2ban &>/dev/null
     sudo rm -f /etc/fail2ban/jail.local
-    sudo apt-get purge -y s-nail msmtp &>/dev/null
-    sudo rm -f /etc/msmtprc /etc/s-nail.rc /usr/local/bin/daily_server_report.sh
-    sudo apt-get purge -y xrdp xfce4* &>/dev/null
-    echo -e "${GREEN}     ✅        系统级工具已卸载。    ${NC}"
+    # 卸载远程桌面和用户
+    if [ -f "/etc/xrdp/xrdp.ini" ]; then
+        local desktop_user=$(grep 'DESKTOP_USER' ${STATE_FILE} | cut -d'=' -f2)
+        if [ -n "$desktop_user" ]; then
+            echo -e "${YELLOW} 正在删除远程桌面用户: ${desktop_user} ...${NC}"
+            sudo deluser --remove-home "$desktop_user" &>/dev/null
+        fi
+        sudo apt-get purge -y xrdp xfce4* &>/dev/null
+        sudo rm -f /root/.xsession
+    fi
+    echo -e "${GREEN}     ✅     系统级工具已卸载。    ${NC}"
 
-    echo -e "\n${YELLOW}     🚀     [4/4]     正在销毁凭证保险箱    ...${NC}"
-    sudo rm -f ${STATE_FILE}
-    echo -e "${GREEN}     ✅        凭证保险箱已销毁。    ${NC}"
+    echo -e "\n${YELLOW}     🚀     [4/5]     正在销毁凭证保险箱和日志...${NC}"
+    sudo rm -f ${STATE_FILE} ${RCLONE_LOG_FILE}
+    echo -e "${GREEN}     ✅     凭证保险箱已销毁。    ${NC}"
+    
+    echo -e "\n${YELLOW}     🚀     [5/5]     正在移除脚本快捷方式...${NC}"
+    sudo rm -f /usr/local/bin/zhangcaiduo
+    echo -e "${GREEN}     ✅     快捷方式已移除。    ${NC}"
 
     echo -e "\n${GREEN}====================     ✅        还原毛坯完成        ✅     ====================${NC}"
     echo "    所有相关服务和数据已被清除。您的服务器已恢复纯净。    "
@@ -1249,17 +1344,18 @@ uninstall_everything() {
 # ---     主循环     ---
 while true; do
     show_main_menu
-    read -p "    请输入您的选择     (u, m, 1-16, 99, q): " choice
+    read -p "    请输入您的选择 (u, m, s, 1-16, 99, q): " choice
 
     case $choice in
         u|U) update_system ;;
         m|M) run_unminimize ;;
+        s|S) manage_swap ;;
         1) [ -d "/root/npm_data" ] && { echo -e "\n${YELLOW}网络水电总管已安装。${NC}"; sleep 2; } || install_npm ;;
         2) [ -d "/root/nextcloud_data" ] && { echo -e "\n${YELLOW}Nextcloud 套件已安装。${NC}"; sleep 2; } || install_nextcloud_suite ;;
         3) [ -d "/root/wordpress_data" ] && { echo -e "\n${YELLOW}WordPress 已安装。${NC}"; sleep 2; } || install_wordpress ;;
         4) [ -d "/root/jellyfin_data" ] && { echo -e "\n${YELLOW}Jellyfin 已安装。${NC}"; sleep 2; } || install_jellyfin ;;
         5) [ -d "/root/ai_stack" ] && { echo -e "\n${YELLOW}AI 大脑已安装。${NC}"; sleep 2; } || install_ai_suite ;;
-        6) [ -d "/root/alist_data" ] && { echo -e "\n${YELLOW}家装工具箱已安装。${NC}"; sleep 2; } || install_support_fleet ;;
+        6) install_support_fleet ;;
         7) install_downloader_suite ;;
         8) [ -f "/etc/fail2ban/jail.local" ] && { echo -e "\n${YELLOW}Fail2ban 已安装。${NC}"; sleep 2; } || install_fail2ban ;;
         9) [ -f "/etc/xrdp/xrdp.ini" ] && { echo -e "\n${YELLOW}远程工作台已安装。${NC}"; sleep 2; } || install_desktop_env ;;
