@@ -1,9 +1,9 @@
 #!/bin/bash
 #================================================================
-# “    VPS 从零开始装修面板    ” v7.0.0 -    权限修复与菜单重构版
-#    1.   修复了Rclone挂载后，Jellyfin/Navidrome/qBittorrent的访问权限问题。
-#    2.   将“工具箱”和“下载集”拆分为独立菜单项，结构更清晰。
-#    3.   继承了 v6.9.0 的全部功能。
+# “    VPS 从零开始装修面板    ” v7.1.0 -    健壮性与环境检查修复版
+#    1.   新增全局 Docker 环境检查函数，确保任何应用部署前 Docker 已就绪。
+#    2.   为所有 docker-compose 命令增加执行结果判断，避免失败后错误报告成功。
+#    3.   移除了 docker-compose 文件中过时的 'version' 标签。
 #     作者     : 張財多 zhangcaiduo.com
 #================================================================
 
@@ -36,6 +36,48 @@ if [[ "$0" != "bash" && "$0" != "sh" ]]; then
     fi
 fi
 
+# ---     核心环境检查函数 (v7.1.0 新增) ---
+ensure_docker_installed() {
+    if ! command -v docker &> /dev/null || ! command -v docker-compose &> /dev/null; then
+        echo -e "${YELLOW}--- 检查到 Docker 或 Docker-Compose 未安装，现在开始自动安装 ---${NC}"
+        sleep 2
+        sudo apt-get update
+        sudo apt-get install -y ca-certificates curl gnupg
+        if ! command -v docker &> /dev/null; then
+            echo -e "${YELLOW} 正在安装 Docker Engine...${NC}"
+            curl -fsSL https://get.docker.com -o get-docker.sh
+            sudo sh get-docker.sh && rm get-docker.sh
+            sudo systemctl restart docker
+            sudo systemctl enable docker
+        fi
+        if ! command -v docker-compose &> /dev/null; then
+            echo -e "${YELLOW} 正在安装 Docker-Compose...${NC}"
+            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo chmod +x /usr/local/bin/docker-compose
+        fi
+        if ! command -v docker &> /dev/null || ! command -v docker-compose &> /dev/null; then
+            echo -e "${RED} 错误：Docker 环境自动安装失败，请检查网络或手动安装后重试。${NC}"
+            sleep 5
+            return 1
+        else
+            echo -e "${GREEN}✅ Docker 环境已成功安装并准备就绪！${NC}"
+            sleep 2
+        fi
+    fi
+
+    # 确保 Docker 服务正在运行
+    if ! sudo docker info >/dev/null 2>&1; then
+        echo -e "${YELLOW}检测到 Docker 服务未运行，正在尝试启动...${NC}"
+        sudo systemctl start docker
+        sleep 3
+        if ! sudo docker info >/dev/null 2>&1; then
+            echo -e "${RED}错误：无法启动 Docker 服务！请手动检查 'sudo systemctl status docker'。${NC}"
+            return 1
+        fi
+        echo -e "${GREEN}✅ Docker 服务已成功启动！${NC}"
+    fi
+    return 0
+}
 
 # ---     系统更新函数  ---
 update_system() {
@@ -152,7 +194,7 @@ show_main_menu() {
                                            zhangcaiduo.com
 "
 
-    echo -e "${GREEN}============ VPS 从毛坯房开始装修VPS 包工头面板 v7.0.0 ============================================${NC}"
+    echo -e "${GREEN}============ VPS 从毛坯房开始装修VPS 包工头面板 v7.1.0 ============================================${NC}"
     echo -e "${BLUE}本脚本适用于 Ubuntu 和 Debian 系统的 VPS 常用项目部署 ${NC}"
     echo -e "${BLUE}如果您退出了装修面板，输入 zhangcaiduo 可再次调出 ${NC}"
     echo -e "${BLUE}=========================================================================================${NC}"
@@ -215,39 +257,13 @@ check_npm_installed() {
 
 # 1. 网络水电总管 (NPM)
 install_npm() {
+    ensure_docker_installed || return
     clear
     echo -e "${BLUE}--- “网络水电总管”开始施工！ ---${NC}";
-    sleep 2
-    echo -e "\n${YELLOW}     🚀     [1/3]     准备系统环境与     Docker...${NC}"
-    sudo apt-get update
-    sudo apt-get install -y ca-certificates curl gnupg
-    if ! command -v docker &> /dev/null; then
-        curl -fsSL https://get.docker.com -o get-docker.sh
-        sudo sh get-docker.sh && rm get-docker.sh
-        sudo systemctl restart docker
-    fi
-    echo -e "${GREEN}     ✅        系统环境与     Docker     已就绪！    ${NC}"
-
-    echo -e "\n${YELLOW}     🚀     [2/3]     检查并安装核心工具     Docker-Compose...${NC}"
-    if ! command -v docker-compose &> /dev/null; then
-        echo -e "\n${YELLOW}检测到系统缺少 docker-compose 工具，正在为您自动安装...${NC}"
-        sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-        sudo chmod +x /usr/local/bin/docker-compose
-        if ! command -v docker-compose &> /dev/null; then
-            echo -e "${RED}错误：docker-compose 自动安装失败，请检查网络或手动安装后重试。${NC}"
-            sleep 5
-            return 1
-        else
-            echo -e "${GREEN}✅ docker-compose 安装成功！${NC}"
-        fi
-        sleep 2
-    fi
-
-    echo -e "\n${YELLOW}     🚀     [3/3]     部署     NPM     并创建专属网络总线    ...${NC}"
+    echo -e "\n${YELLOW}     🚀     部署     NPM     并创建专属网络总线    ...${NC}"
     sudo docker network create npm_data_default || true
     mkdir -p /root/npm_data
     cat > /root/npm_data/docker-compose.yml <<'EOF'
-version: '3.8'
 services:
   app:
     image: 'jc21/nginx-proxy-manager:latest'
@@ -268,13 +284,17 @@ networks:
     name: npm_data_default
     external: true
 EOF
-    (cd /root/npm_data && sudo docker-compose up -d)
-    echo -e "${GREEN}     ✅     网络水电总管 (NPM)     部署完毕！    ${NC}"
+    if (cd /root/npm_data && sudo docker-compose up -d); then
+        echo -e "${GREEN}     ✅     网络水电总管 (NPM)     部署完毕！    ${NC}"
+    else
+        echo -e "${RED}     ❌     NPM 部署失败！请检查 Docker 是否正常运行。    ${NC}"
+    fi
     echo -e "\n${GREEN}    按任意键返回主菜单    ...${NC}"; read -n 1 -s
 }
 
 # 2. Nextcloud     套件
 install_nextcloud_suite() {
+    ensure_docker_installed || return
     check_npm_installed || return
     read -p "    请输入您的主域名     (    例如     zhangcaiduo.com): " MAIN_DOMAIN
     if [ -z "$MAIN_DOMAIN" ]; then echo -e "${RED}     错误：主域名不能为空！    ${NC}"; sleep 2; return; fi
@@ -286,11 +306,9 @@ install_nextcloud_suite() {
 
     clear
     echo -e "${BLUE}--- “Nextcloud 家庭数据中心”部署计划启动！ ---${NC}";
-    sleep 2
-
+    
     mkdir -p /root/nextcloud_data
     cat > /root/nextcloud_data/docker-compose.yml <<EOF
-version: '3.8'
 services:
   db:
     image: mariadb:11.4
@@ -333,12 +351,14 @@ networks:
     external: true
 EOF
     echo -e "opcache.memory_consumption=512\nopcache.interned_strings_buffer=16" > /root/nextcloud_data/php-opcache.ini
-    (cd /root/nextcloud_data && sudo docker-compose up -d)
-    echo -e "${GREEN}     ✅        数据中心主体     (Nextcloud)     启动完毕！    ${NC}"
+    if (cd /root/nextcloud_data && sudo docker-compose up -d); then
+        echo -e "${GREEN}     ✅        数据中心主体     (Nextcloud)     启动完毕！    ${NC}"
+    else
+        echo -e "${RED}     ❌     Nextcloud 部署失败！请检查 Docker 是否正常运行。    ${NC}"; sleep 4; return
+    fi
 
     mkdir -p /root/onlyoffice_data
     cat > /root/onlyoffice_data/docker-compose.yml <<EOF
-version: '3.8'
 services:
   onlyoffice:
     image: onlyoffice/documentserver:latest
@@ -358,8 +378,11 @@ networks:
     name: npm_data_default
     external: true
 EOF
-    (cd /root/onlyoffice_data && sudo docker-compose up -d)
-    echo -e "${GREEN}     ✅        在线办公室     (OnlyOffice)     部署完毕！    ${NC}"
+    if (cd /root/onlyoffice_data && sudo docker-compose up -d); then
+        echo -e "${GREEN}     ✅        在线办公室     (OnlyOffice)     部署完毕！    ${NC}"
+    else
+        echo -e "${RED}     ❌     OnlyOffice 部署失败！请检查 Docker 是否正常运行。    ${NC}"; sleep 4; return
+    fi
 
     echo "##     Nextcloud 套件凭证     (    部署于    : $(date))" > ${STATE_FILE}
     echo "NEXTCLOUD_DOMAIN=${NEXTCLOUD_DOMAIN}" >> ${STATE_FILE}
@@ -373,6 +396,7 @@ EOF
 
 # 3. WordPress
 install_wordpress() {
+    ensure_docker_installed || return
     check_npm_installed || return
     read -p "    请输入您的     WordPress     主域名     (    例如     zhangcaiduo.com): " WP_DOMAIN
     if [ -z "$WP_DOMAIN" ]; then echo -e "${RED}     错误：域名不能为空！    ${NC}"; sleep 2; return; fi
@@ -382,10 +406,8 @@ install_wordpress() {
 
     clear
     echo -e "${BLUE}--- “WordPress 个人博客”建造计划启动！ ---${NC}";
-    sleep 2
     mkdir -p /root/wordpress_data
     cat > /root/wordpress_data/docker-compose.yml <<EOF
-version: '3.8'
 services:
   db:
     image: mariadb:11.4
@@ -422,28 +444,28 @@ networks:
     name: npm_data_default
     external: true
 EOF
-    (cd /root/wordpress_data && sudo docker-compose up -d)
-    echo -e "${GREEN}     ✅     WordPress     已在后台启动！    ${NC}"
-
-    echo -e "\n## WordPress     凭证     (    部署于    : $(date))" >> ${STATE_FILE}
-    echo "WORDPRESS_DOMAIN=${WP_DOMAIN}" >> ${STATE_FILE}
-
-    echo -e "\n${GREEN}===============     ✅     WordPress     部署完成        ✅     ===============${NC}"
-    echo "    请在     NPM     中为     ${BLUE}${WP_DOMAIN}${NC} (    以及     www.${WP_DOMAIN})     配置代理，指向     ${BLUE}wordpress_app:80${NC}"
+    if (cd /root/wordpress_data && sudo docker-compose up -d); then
+        echo -e "${GREEN}     ✅     WordPress     已在后台启动！    ${NC}"
+        echo -e "\n## WordPress     凭证     (    部署于    : $(date))" >> ${STATE_FILE}
+        echo "WORDPRESS_DOMAIN=${WP_DOMAIN}" >> ${STATE_FILE}
+        echo -e "\n${GREEN}===============     ✅     WordPress     部署完成        ✅     ===============${NC}"
+        echo "    请在     NPM     中为     ${BLUE}${WP_DOMAIN}${NC} (    以及     www.${WP_DOMAIN})     配置代理，指向     ${BLUE}wordpress_app:80${NC}"
+    else
+        echo -e "${RED}     ❌     WordPress 部署失败！请检查上面的错误信息。    ${NC}"
+    fi
     echo -e "\n${GREEN}    按任意键返回主菜单    ...${NC}"; read -n 1 -s
 }
 
 # 4. AI     核心
 install_ai_suite() {
+    ensure_docker_installed || return
     check_npm_installed || return
     read -p "    请输入您为     AI     规划的子域名     (    例如     ai.zhangcaiduo.com): " AI_DOMAIN
     if [ -z "$AI_DOMAIN" ]; then echo -e "${RED}     错误：    AI     域名不能为空！    ${NC}"; sleep 2; return; fi
     clear
     echo -e "${BLUE}--- “AI 大脑”激活计划启动！ ---${NC}";
-    sleep 2
     mkdir -p /root/ai_stack
     cat > /root/ai_stack/docker-compose.yml <<'EOF'
-version: '3.8'
 services:
   ollama:
     image: ollama/ollama
@@ -470,23 +492,26 @@ networks:
     name: npm_data_default
     external: true
 EOF
-    (cd /root/ai_stack && sudo docker-compose up -d)
-    echo -e "${GREEN}     ✅     AI     核心已在后台启动！    ${NC}"
-    echo -e "\n## AI     核心凭证     (    部署于    : $(date))" >> ${STATE_FILE}
-    echo "AI_DOMAIN=${AI_DOMAIN}" >> ${STATE_FILE}
-    echo -e "\n${GREEN}AI     核心部署完成    !     强烈建议立即选择一个知识库进行安装    !${NC}"
-    install_ai_model
+    if (cd /root/ai_stack && sudo docker-compose up -d); then
+        echo -e "${GREEN}     ✅     AI     核心已在后台启动！    ${NC}"
+        echo -e "\n## AI     核心凭证     (    部署于    : $(date))" >> ${STATE_FILE}
+        echo "AI_DOMAIN=${AI_DOMAIN}" >> ${STATE_FILE}
+        echo -e "\n${GREEN}AI     核心部署完成    !     强烈建议立即选择一个知识库进行安装    !${NC}"
+        install_ai_model
+    else
+        echo -e "${RED}     ❌     AI 核心部署失败！请检查上面的错误信息。    ${NC}"
+        echo -e "\n${GREEN}    按任意键返回主菜单    ...${NC}"; read -n 1 -s
+    fi
 }
 
 # 5. Jellyfin
 install_jellyfin() {
+    ensure_docker_installed || return
     check_npm_installed || return
     clear
     echo -e "${BLUE}--- “Jellyfin 家庭影院”建造计划启动！ ---${NC}";
-    sleep 2
     mkdir -p /root/jellyfin_data/config /mnt/Movies /mnt/TVShows /mnt/Music
     cat > /root/jellyfin_data/docker-compose.yml <<'EOF'
-version: '3.8'
 services:
   jellyfin:
     image: jellyfin/jellyfin:latest
@@ -509,23 +534,25 @@ networks:
     name: npm_data_default
     external: true
 EOF
-    (cd /root/jellyfin_data && sudo docker-compose up -d)
-    echo -e "${GREEN}     ✅     Jellyfin     已在后台启动！    ${NC}"
-    echo -e "\n${GREEN}===============     ✅     Jellyfin     部署完成        ✅     ===============${NC}"
-    echo "    请在     NPM     中为您规划的域名配置代理，指向     ${BLUE}jellyfin_app:8096${NC}"
-    echo "    媒体库目录已创建    : /mnt/Movies, /mnt/TVShows, /mnt/Music"
+    if (cd /root/jellyfin_data && sudo docker-compose up -d); then
+        echo -e "${GREEN}     ✅     Jellyfin     已在后台启动！    ${NC}"
+        echo -e "\n${GREEN}===============     ✅     Jellyfin     部署完成        ✅     ===============${NC}"
+        echo "    请在     NPM     中为您规划的域名配置代理，指向     ${BLUE}jellyfin_app:8096${NC}"
+        echo "    媒体库目录已创建    : /mnt/Movies, /mnt/TVShows, /mnt/Music"
+    else
+        echo -e "${RED}     ❌     Jellyfin 部署失败！请检查上面的错误信息。    ${NC}"
+    fi
     echo -e "\n${GREEN}    按任意键返回主菜单    ...${NC}"; read -n 1 -s
 }
 
 # 6. Navidrome
 install_navidrome() {
+    ensure_docker_installed || return
     check_npm_installed || return
     clear
     echo -e "${BLUE}--- “Navidrome 音乐服务器”部署计划启动！ ---${NC}"
-    sleep 2
     mkdir -p /root/navidrome_data /mnt/Music
     cat > /root/navidrome_data/docker-compose.yml <<'EOF'
-version: '3.8'
 services:
   navidrome:
     image: deluan/navidrome:latest
@@ -546,21 +573,23 @@ networks:
     name: npm_data_default
     external: true
 EOF
-    (cd /root/navidrome_data && sudo docker-compose up -d)
-    echo -e "${GREEN} ✅  Navidrome 已启动！内部端口: 4533. 媒体库: /mnt/Music ${NC}"
-    echo "    请在     NPM     中为您规划的域名配置代理，指向     ${BLUE}navidrome_app:4533${NC}"
+    if (cd /root/navidrome_data && sudo docker-compose up -d); then
+        echo -e "${GREEN} ✅  Navidrome 已启动！内部端口: 4533. 媒体库: /mnt/Music ${NC}"
+        echo "    请在     NPM     中为您规划的域名配置代理，指向     ${BLUE}navidrome_app:4533${NC}"
+    else
+        echo -e "${RED}     ❌     Navidrome 部署失败！请检查上面的错误信息。    ${NC}"
+    fi
     echo -e "\n${GREEN}    按任意键返回主菜单    ...${NC}"; read -n 1 -s
 }
 
 # 7. Alist
 install_alist() {
+    ensure_docker_installed || return
     check_npm_installed || return
     clear
     echo -e "${BLUE}--- “Alist 网盘挂载”部署计划启动！ ---${NC}"
-    sleep 2
     mkdir -p /root/alist_data
     cat >/root/alist_data/docker-compose.yml <<'EOF'
-version: '3.8'
 services:
   alist:
     image: xhofe/alist:latest
@@ -575,22 +604,24 @@ networks:
     name: npm_data_default
     external: true
 EOF
-    (cd /root/alist_data && sudo docker-compose up -d)
-    echo -e "${GREEN} ✅  Alist 已启动！内部端口: 5244 ${NC}"
-    echo "    请在     NPM     中为您规划的域名配置代理，指向     ${BLUE}alist_app:5244${NC}"
-    echo -e "${CYAN} 请使用以下命令查看初始密码: sudo docker exec alist_app ./alist admin ${NC}"
+    if (cd /root/alist_data && sudo docker-compose up -d); then
+        echo -e "${GREEN} ✅  Alist 已启动！内部端口: 5244 ${NC}"
+        echo "    请在     NPM     中为您规划的域名配置代理，指向     ${BLUE}alist_app:5244${NC}"
+        echo -e "${CYAN} 请使用以下命令查看初始密码: sudo docker exec alist_app ./alist admin ${NC}"
+    else
+        echo -e "${RED}     ❌     Alist 部署失败！请检查上面的错误信息。    ${NC}"
+    fi
     echo -e "\n${GREEN}    按任意键返回主菜单    ...${NC}"; read -n 1 -s
 }
 
 # 8. Gitea
 install_gitea() {
+    ensure_docker_installed || return
     check_npm_installed || return
     clear
     echo -e "${BLUE}--- “Gitea 代码仓库”部署计划启动！ ---${NC}"
-    sleep 2
     mkdir -p /root/gitea_data
     cat >/root/gitea_data/docker-compose.yml <<'EOF'
-version: '3.8'
 services:
   server:
     image: gitea/gitea:latest
@@ -610,21 +641,23 @@ networks:
     name: npm_data_default
     external: true
 EOF
-    (cd /root/gitea_data && sudo docker-compose up -d)
-    echo -e "${GREEN} ✅  Gitea 已启动！内部端口: 3000 ${NC}"
-    echo "    请在     NPM     中为您规划的域名配置代理，指向     ${BLUE}gitea_app:3000${NC}"
+    if (cd /root/gitea_data && sudo docker-compose up -d); then
+        echo -e "${GREEN} ✅  Gitea 已启动！内部端口: 3000 ${NC}"
+        echo "    请在     NPM     中为您规划的域名配置代理，指向     ${BLUE}gitea_app:3000${NC}"
+    else
+        echo -e "${RED}     ❌     Gitea 部署失败！请检查上面的错误信息。    ${NC}"
+    fi
     echo -e "\n${GREEN}    按任意键返回主菜单    ...${NC}"; read -n 1 -s
 }
 
 # 9. Memos
 install_memos() {
+    ensure_docker_installed || return
     check_npm_installed || return
     clear
     echo -e "${BLUE}--- “Memos 轻量笔记”部署计划启动！ ---${NC}"
-    sleep 2
     mkdir -p /root/memos_data
     cat >/root/memos_data/docker-compose.yml <<'EOF'
-version: '3.8'
 services:
   memos:
     image: neosmemo/memos:latest
@@ -639,21 +672,23 @@ networks:
     name: npm_data_default
     external: true
 EOF
-    (cd /root/memos_data && sudo docker-compose up -d)
-    echo -e "${GREEN} ✅  Memos 已启动！内部端口: 5230 ${NC}"
-    echo "    请在     NPM     中为您规划的域名配置代理，指向     ${BLUE}memos_app:5230${NC}"
+    if (cd /root/memos_data && sudo docker-compose up -d); then
+        echo -e "${GREEN} ✅  Memos 已启动！内部端口: 5230 ${NC}"
+        echo "    请在     NPM     中为您规划的域名配置代理，指向     ${BLUE}memos_app:5230${NC}"
+    else
+        echo -e "${RED}     ❌     Memos 部署失败！请检查上面的错误信息。    ${NC}"
+    fi
     echo -e "\n${GREEN}    按任意键返回主菜单    ...${NC}"; read -n 1 -s
 }
 
 # 10. qBittorrent
 install_qbittorrent() {
+    ensure_docker_installed || return
     check_npm_installed || return
     clear
     echo -e "${BLUE}--- “qBittorrent 下载器”部署计划启动！ ---${NC}"
-    sleep 2
     mkdir -p /root/qbittorrent_data /mnt/Downloads
     cat > /root/qbittorrent_data/docker-compose.yml <<'EOF'
-version: '3.8'
 services:
   qbittorrent:
     image: lscr.io/linuxserver/qbittorrent:latest
@@ -674,22 +709,24 @@ networks:
     name: npm_data_default
     external: true
 EOF
-    (cd /root/qbittorrent_data && sudo docker-compose up -d)
-    echo -e "${GREEN} ✅  qBittorrent 已启动！内部端口: 8080, 下载目录: /mnt/Downloads ${NC}"
-    echo "    请在     NPM     中为您规划的域名配置代理，指向     ${BLUE}qbittorrent_app:8080${NC}"
+    if (cd /root/qbittorrent_data && sudo docker-compose up -d); then
+        echo -e "${GREEN} ✅  qBittorrent 已启动！内部端口: 8080, 下载目录: /mnt/Downloads ${NC}"
+        echo "    请在     NPM     中为您规划的域名配置代理，指向     ${BLUE}qbittorrent_app:8080${NC}"
+    else
+        echo -e "${RED}     ❌     qBittorrent 部署失败！请检查上面的错误信息。    ${NC}"
+    fi
     echo -e "\n${GREEN}    按任意键返回主菜单    ...${NC}"; read -n 1 -s
 }
 
 # 11. JDownloader
 install_jdownloader() {
+    ensure_docker_installed || return
     check_npm_installed || return
     clear
     echo -e "${BLUE}--- “JDownloader 下载器”部署计划启动！ ---${NC}"
-    sleep 2
     JDOWNLOADER_PASS="VNC-Pass-$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 8)"
     mkdir -p /root/jdownloader_data /mnt/Downloads
     cat > /root/jdownloader_data/docker-compose.yml <<EOF
-version: '3.8'
 services:
   jdownloader-2:
     image: jlesage/jdownloader-2
@@ -710,24 +747,26 @@ networks:
     name: npm_data_default
     external: true
 EOF
-    (cd /root/jdownloader_data && sudo docker-compose up -d)
-    echo "JDOWNLOADER_VNC_PASSWORD=${JDOWNLOADER_PASS}" >> ${STATE_FILE}
-    echo -e "${GREEN} ✅  JDownloader 已启动！VNC 密码 ${JDOWNLOADER_PASS} 已保存。内部端口 5800 ${NC}"
-    echo "    请在     NPM     中为您规划的域名配置代理，指向     ${BLUE}jdownloader_app:5800${NC}"
+    if (cd /root/jdownloader_data && sudo docker-compose up -d); then
+        echo "JDOWNLOADER_VNC_PASSWORD=${JDOWNLOADER_PASS}" >> ${STATE_FILE}
+        echo -e "${GREEN} ✅  JDownloader 已启动！VNC 密码 ${JDOWNLOADER_PASS} 已保存。内部端口 5800 ${NC}"
+        echo "    请在     NPM     中为您规划的域名配置代理，指向     ${BLUE}jdownloader_app:5800${NC}"
+    else
+        echo -e "${RED}     ❌     JDownloader 部署失败！请检查上面的错误信息。    ${NC}"
+    fi
     echo -e "\n${GREEN}    按任意键返回主菜单    ...${NC}"; read -n 1 -s
 }
 
 # 12. yt-dlp
 install_ytdlp() {
+    ensure_docker_installed || return
     check_npm_installed || return
     clear
     read -p "    请输入您为 yt-dlp 规划的子域名 (例如 ytdl.zhangcaiduo.com): " YTDL_DOMAIN
     if [ -z "$YTDL_DOMAIN" ]; then echo -e "${RED}yt-dlp 域名不能为空，安装取消。${NC}"; sleep 2; return; fi
     echo -e "${BLUE}--- “yt-dlp 视频下载器”部署计划启动！ ---${NC}"
-    sleep 2
     mkdir -p /root/ytdlp_data /mnt/Downloads
     cat > /root/ytdlp_data/docker-compose.yml <<EOF
-version: '3.8'
 services:
   ytdlp-ui:
     image: tzahi12345/youtubedl-material:latest
@@ -745,10 +784,13 @@ networks:
     name: npm_data_default
     external: true
 EOF
-    (cd /root/ytdlp_data && sudo docker-compose up -d)
-    echo "YTDL_DOMAIN=${YTDL_DOMAIN}" >> ${STATE_FILE}
-    echo -e "${GREEN} ✅  yt-dlp 已启动！内部端口 8080。请配置NPM反代到 ytdlp_app:8080 ${NC}"
-    echo "    请在     NPM     中为     ${BLUE}${YTDL_DOMAIN}${NC} 配置代理，指向     ${BLUE}ytdlp_app:8080${NC}"
+    if (cd /root/ytdlp_data && sudo docker-compose up -d); then
+        echo "YTDL_DOMAIN=${YTDL_DOMAIN}" >> ${STATE_FILE}
+        echo -e "${GREEN} ✅  yt-dlp 已启动！内部端口 8080。请配置NPM反代到 ytdlp_app:8080 ${NC}"
+        echo "    请在     NPM     中为     ${BLUE}${YTDL_DOMAIN}${NC} 配置代理，指向     ${BLUE}ytdlp_app:8080${NC}"
+    else
+        echo -e "${RED}     ❌     yt-dlp 部署失败！请检查上面的错误信息。    ${NC}"
+    fi
     echo -e "\n${GREEN}    按任意键返回主菜单    ...${NC}"; read -n 1 -s
 }
 
@@ -1026,6 +1068,7 @@ EOF
 
 # 21.     安装     AI     知识库
 install_ai_model() {
+    ensure_docker_installed || return
     if [ ! -d "/root/ai_stack" ]; then echo -e "${RED}     错误：AI 大脑未安装!${NC}"; sleep 3; return; fi
     clear
     echo -e "${BLUE}---     为 AI 大脑安装知识库 (安装大语言模型) ---${NC}"
@@ -1060,6 +1103,7 @@ install_ai_model() {
 
 # 22. Nextcloud     优化
 run_nextcloud_optimization() {
+    ensure_docker_installed || return
     if [ ! -d "/root/nextcloud_data" ]; then echo -e "${RED}     错误：Nextcloud 套件未安装!${NC}"; sleep 3; return; fi
     clear
     echo -e "${BLUE}--- “Nextcloud 精装修”计划启动！ ---${NC}";
@@ -1091,6 +1135,7 @@ run_nextcloud_optimization() {
 
 # 23.     服务控制中心
 show_service_control_panel() {
+    ensure_docker_installed || return
     while true; do
         clear
         echo -e "${BLUE}---     服务控制中心     ---${NC}"
