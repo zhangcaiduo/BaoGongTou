@@ -294,6 +294,9 @@ show_main_menu() {
     echo -e "${GREEN}===================================================================================================${NC}"
     printf "  %-58s\t%s\n" "26) 打开“科学上网”工具箱" "[ Warp, Argo, OpenVPN ]"
     echo -e "${GREEN}===================================================================================================${NC}"
+    echo -e "${GREEN}===================================================================================================${NC}"
+    printf "  %-58s\t%s\n" "27) 召唤【IPv6 专用】工具箱" "[ ${YELLOW}专治德鸡Euserv.哈鸡 Hax 等免费VPS${NC} ]"
+    echo -e "${GREEN}===================================================================================================${NC}"
     echo ""
     printf "  %-58s\t%s\n" "X)  一键深度清理 (清理垃圾与缓存)" "[ ${CYAN}让小鸡更丝滑${NC} ]"
     printf "  %-58s\t%s\n" "99) ${RED}一键辞退包工头${NC}" "[ ${RED}注：此选项将会拆卸本脚本！！！${NC} ]"
@@ -1248,6 +1251,7 @@ while true; do
         24) show_credentials ;;
         25) show_vps_status ;;
         26) install_science_tools ;;
+        27) bash <(wget -qO- https://raw.githubusercontent.com/zhangcaiduo/BaoGongTou/main/ipv6_toolbox.sh) ;;
         x|X) system_cleanup ;;
         99) uninstall_everything ;;
         q|Q) echo -e "${BLUE}    装修愉快，房主再见！    ${NC}"; exit 0 ;;
