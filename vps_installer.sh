@@ -1125,7 +1125,7 @@ show_service_control_panel() {
 }
 
 
-# 24. 查看密码与数据路径 - (v6.6.6 最终智能版)
+# 24. 查看密码与数据路径 - (v6.6.7 最终指令版)
 show_credentials() {
     if [ ! -f "${STATE_FILE}" ]; then echo -e "\n${YELLOW}     尚未开始装修，没有凭证信息。    ${NC}"; sleep 2; return; fi
     clear
@@ -1133,50 +1133,38 @@ show_credentials() {
     
     # --- 静态凭证显示 ---
     local credentials_content=$(grep -v -e "DESKTOP_USER" "${STATE_FILE}")
-    echo "${credentials_content}" | while IFS= read -r line; do
-        if [[ "$line" == *"Nextcloud 套件凭证"* ]]; then
-            echo -e "${CYAN}--- Nextcloud 安装所需信息 ---${NC}"
-            local db_password=$(echo "${credentials_content}" | grep 'DB_PASSWORD' | cut -d'=' -f2)
-            echo "       数据库用户    : nextclouduser"
-            echo "       数据库密码    : ${db_password}"
-            echo "       数据库名      : nextclouddb"
-            echo "       数据库主机    : nextcloud_db"
-            echo "${credentials_content}" | grep -E "NEXTCLOUD_DOMAIN|ONLYOFFICE_DOMAIN|ONLYOFFICE_JWT_SECRET" | sed 's/^/  /'
-            echo ""
-        elif [[ "$line" == *"WordPress 凭证"* || "$line" == *"AI 核心凭证"* || "$line" == *"JDownloader"* ]]; then
-             echo -e "${CYAN}--- $(echo $line | sed 's/##//; s/(.*)//' | xargs) ---${NC}"
-             echo "${credentials_content}" | grep -A1 "$line" | grep -v "$line" | sed 's/^/  /'
-             echo ""
-        fi
-    done
-
-    # --- 动态获取的初始密码 ---
-    echo -e "${CYAN}--- 动态获取的初始密码 (部分应用首次启动时生成) ---${NC}"
-    # 检查 Alist
-    if [ -d "/root/alist_data" ]; then
-        if sudo docker ps -q -f "name=alist_app" | grep -q .; then
-            local alist_pass=$(sudo docker exec alist_app ./alist admin)
-            echo "  - Alist 初始密码: ${GREEN}${alist_pass}${NC}"
-        else
-            echo "  - Alist: ${YELLOW}未在运行, 无法获取密码。${NC}"
-        fi
-    fi
-
-    # 检查 qBittorrent
-    if [ -d "/root/qbittorrent_data" ]; then
-        if sudo docker ps -q -f "name=qbittorrent_app" | grep -q .; then
-            local qbit_pass_line=$(sudo docker logs qbittorrent_app 2>&1 | grep 'The Web UI administrator password is:')
-            if [ -n "$qbit_pass_line" ]; then
-                local qbit_pass=$(echo $qbit_pass_line | awk -F': ' '{print $2}')
-                echo "  - qBittorrent 初始密码: ${GREEN}${qbit_pass}${NC}"
-            else
-                echo "  - qBittorrent 初始密码: ${YELLOW}未在日志中找到 (可能您已修改过)。${NC}"
+    if [ -n "${credentials_content}" ]; then
+        echo "${credentials_content}" | while IFS= read -r line; do
+            if [[ "$line" == *"Nextcloud 套件凭证"* ]]; then
+                echo -e "${CYAN}--- Nextcloud 安装所需信息 ---${NC}"
+                local db_password=$(echo "${credentials_content}" | grep 'DB_PASSWORD' | cut -d'=' -f2)
+                echo "       数据库用户    : nextclouduser"
+                echo "       数据库密码    : ${db_password}"
+                echo "       数据库名      : nextclouddb"
+                echo "       数据库主机    : nextcloud_db"
+                echo "${credentials_content}" | grep -E "NEXTCLOUD_DOMAIN|ONLYOFFICE_DOMAIN|ONLYOFFICE_JWT_SECRET" | sed 's/^/  /'
+                echo ""
+            elif [[ "$line" == *"WordPress 凭证"* || "$line" == *"AI 核心凭证"* || "$line" == *"JDownloader"* ]]; then
+                echo -e "${CYAN}--- $(echo $line | sed 's/##//; s/(.*)//' | xargs) ---${NC}"
+                echo "${credentials_content}" | grep -A1 "$line" | grep -v "$line" | sed 's/^/  /'
+                echo ""
             fi
-        else
-            echo "  - qBittorrent: ${YELLOW}未在运行, 无法获取密码。${NC}"
+        done
+    fi
+
+    # --- 获取初始密码的指令 ---
+    if [ -d "/root/alist_data" ] || [ -d "/root/qbittorrent_data" ]; then
+        echo -e "${CYAN}--- 获取应用初始密码的命令 ---${NC}"
+        if [ -d "/root/alist_data" ]; then
+            echo -e "  1. 如需获取或重置 Alist 管理员密码，请退出本面板后执行："
+            echo -e "     ${GREEN}sudo docker exec alist_app ./alist admin random${NC}\n"
+        fi
+        if [ -d "/root/qbittorrent_data" ]; then
+            echo -e "  2. qBittorrent 的初始密码在首次启动的日志中。请退出本面板后执行以下命令查看："
+            echo -e "     ${GREEN}sudo docker logs qbittorrent_app${NC}"
+            echo -e "     ${YELLOW}(在日志中找到 The Web UI administrator password is: xxxxxxxx 这一行)${NC}\n"
         fi
     fi
-    echo ""
 
     # --- 应用数据目录 ---
     echo -e "${CYAN}---     应用数据目录     ---${NC}"
