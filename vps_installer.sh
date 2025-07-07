@@ -231,6 +231,8 @@ show_main_menu() {
     check_and_display "11" "部署 JDownloader 下载器" "/root/jdownloader_data" "docker:jdownloader_app:5800"
     check_and_display "12" "部署 yt-dlp 视频下载器" "/root/ytdlp_data" "docker_nopm:ytdlp_app"
 
+    echo -e "      ${CYAN}注意: 关联Rclone后, 请确保在下载器WEB界面中, 保存路径为 /downloads 或 /output ${NC}"
+
     echo -e "  ${GREEN}---  安防与工具  ---${NC}"
     check_and_display "15" "部署全屋安防系统 (Fail2ban)" "/etc/fail2ban/jail.local" "system"
     check_and_display "16" "部署远程工作台 (Xfce)" "/etc/xrdp/xrdp.ini" "system_port:3389"
@@ -1234,7 +1236,7 @@ show_service_control_panel() {
                     read -n 1 -s -r -p "按任意键返回..."
                     continue
                     ;;
-                5)  # 关联 Rclone
+                    5)  # 关联 Rclone
                     if ! grep -q "RCLONE_MOUNT_PATH" "${STATE_FILE}"; then
                         echo -e "${RED}错误：Rclone 未配置或未完全配置。请先在主菜单选择 '18' 完成配置。${NC}"; sleep 4; continue
                     fi
@@ -1276,6 +1278,20 @@ show_service_control_panel() {
                     (cd $s_path && sudo docker-compose up -d --force-recreate)
                     sleep 2
                     echo -e "${GREEN} ✅ 服务已重启！${NC}"
+
+                    # 新增：根据服务名称，提供应用内路径设置的提示
+                    local app_internal_path=""
+                    case "$s_name" in
+                        "qBittorrent") app_internal_path="/downloads" ;;
+                        "JDownloader") app_internal_path="/output" ;;
+                        "yt-dlp 下载") app_internal_path="/app/downloads" ;;
+                    esac
+
+                    if [ -n "$app_internal_path" ]; then
+                        echo -e "\n${YELLOW}🔔 温馨提示：关联已成功！这只是第一步。${NC}"
+                        echo -e "${YELLOW}   您还需要在【${s_name}的Web界面】里，将文件的【保存路径】或【下载目录】设置为 ${GREEN}${app_internal_path}${NC}"
+                        echo -e "${YELLOW}   这样，新任务才会默认保存到您刚刚关联的Rclone网盘文件夹中！${NC}"
+                    fi
                     ;;
                 6) sudo docker-compose -f ${compose_file} logs -f --tail 50;;
                 b) continue;;
