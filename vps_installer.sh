@@ -1125,38 +1125,60 @@ show_service_control_panel() {
 }
 
 
-# 24. 显示凭证 - 对应新菜单 24 (信息补全版)
+# 24. 查看密码与数据路径 - (v6.6.6 最终智能版)
 show_credentials() {
     if [ ! -f "${STATE_FILE}" ]; then echo -e "\n${YELLOW}     尚未开始装修，没有凭证信息。    ${NC}"; sleep 2; return; fi
     clear
     echo -e "${RED}====================     🔑        【重要凭证保险箱】        🔑     ====================${NC}"
     
-    # 查找所有凭证并显示
+    # --- 静态凭证显示 ---
     local credentials_content=$(grep -v -e "DESKTOP_USER" "${STATE_FILE}")
     echo "${credentials_content}" | while IFS= read -r line; do
         if [[ "$line" == *"Nextcloud 套件凭证"* ]]; then
             echo -e "${CYAN}--- Nextcloud 安装所需信息 ---${NC}"
-            echo "  ${line}" # 显示原始的凭证标题行
-            
-            # 显示 Nextcloud 相关的详细数据库信息
             local db_password=$(echo "${credentials_content}" | grep 'DB_PASSWORD' | cut -d'=' -f2)
             echo "       数据库用户    : nextclouduser"
             echo "       数据库密码    : ${db_password}"
             echo "       数据库名      : nextclouddb"
             echo "       数据库主机    : nextcloud_db"
-            
-            # 显示其他 Nextcloud 相关凭证，排除已手动显示的密码
             echo "${credentials_content}" | grep -E "NEXTCLOUD_DOMAIN|ONLYOFFICE_DOMAIN|ONLYOFFICE_JWT_SECRET" | sed 's/^/  /'
             echo ""
-
         elif [[ "$line" == *"WordPress 凭证"* || "$line" == *"AI 核心凭证"* || "$line" == *"JDownloader"* ]]; then
-             # 对于其他带标题的凭证，正常显示
              echo -e "${CYAN}--- $(echo $line | sed 's/##//; s/(.*)//' | xargs) ---${NC}"
              echo "${credentials_content}" | grep -A1 "$line" | grep -v "$line" | sed 's/^/  /'
              echo ""
         fi
     done
-    
+
+    # --- 动态获取的初始密码 ---
+    echo -e "${CYAN}--- 动态获取的初始密码 (部分应用首次启动时生成) ---${NC}"
+    # 检查 Alist
+    if [ -d "/root/alist_data" ]; then
+        if sudo docker ps -q -f "name=alist_app" | grep -q .; then
+            local alist_pass=$(sudo docker exec alist_app ./alist admin)
+            echo "  - Alist 初始密码: ${GREEN}${alist_pass}${NC}"
+        else
+            echo "  - Alist: ${YELLOW}未在运行, 无法获取密码。${NC}"
+        fi
+    fi
+
+    # 检查 qBittorrent
+    if [ -d "/root/qbittorrent_data" ]; then
+        if sudo docker ps -q -f "name=qbittorrent_app" | grep -q .; then
+            local qbit_pass_line=$(sudo docker logs qbittorrent_app 2>&1 | grep 'The Web UI administrator password is:')
+            if [ -n "$qbit_pass_line" ]; then
+                local qbit_pass=$(echo $qbit_pass_line | awk -F': ' '{print $2}')
+                echo "  - qBittorrent 初始密码: ${GREEN}${qbit_pass}${NC}"
+            else
+                echo "  - qBittorrent 初始密码: ${YELLOW}未在日志中找到 (可能您已修改过)。${NC}"
+            fi
+        else
+            echo "  - qBittorrent: ${YELLOW}未在运行, 无法获取密码。${NC}"
+        fi
+    fi
+    echo ""
+
+    # --- 应用数据目录 ---
     echo -e "${CYAN}---     应用数据目录     ---${NC}"
     [ -d "/mnt/Music" ] && echo "  🎵 音乐库 (Navidrome/Jellyfin): /mnt/Music"
     [ -d "/mnt/Movies" ] && echo "  🎬 电影库 (Jellyfin): /mnt/Movies"
@@ -1169,22 +1191,6 @@ show_credentials() {
     echo -e "${RED}================================================================================${NC}"
     read -n 1 -s -r -p "按任意键返回主菜单..."
 }
-
-# 26. 科学工具箱 - 对应新菜单 26
-install_science_tools() {
-    clear
-    echo -e "${RED}--- “    科学    ”    工具箱     ---${NC}"
-    echo "1) Warp (by fscarmen)"; echo "2) ArgoX (by fscarmen)"; echo "3) OpenVPN (by Nyr)"; echo "b) 返回"
-    read -p "请输入您的选择: " science_choice
-    case $science_choice in
-        1) bash <(wget -qO- https://gitlab.com/fscarmen/warp/-/raw/main/menu.sh) ;;
-        2) bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/argox/main/argox.sh) ;;
-        3) wget https://git.io/vpn -O openvpn-install.sh && sudo bash openvpn-install.sh ;;
-        b) return ;; *) echo -e "${RED}无效选择!${NC}"; sleep 2; return;;
-    esac
-    read -n 1 -s -r -p "操作完成，按任意键返回主菜单..."
-}
-
 # 99. 一键还原毛坯
 uninstall_everything() {
     clear
