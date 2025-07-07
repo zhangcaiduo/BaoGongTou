@@ -1092,19 +1092,48 @@ show_service_control_panel() {
 }
 
 
-# 24. 显示凭证 - 对应新菜单 24
+# 24. 显示凭证 - 对应新菜单 24 (信息补全版)
 show_credentials() {
     if [ ! -f "${STATE_FILE}" ]; then echo -e "\n${YELLOW}     尚未开始装修，没有凭证信息。    ${NC}"; sleep 2; return; fi
     clear
     echo -e "${RED}====================     🔑        【重要凭证保险箱】        🔑     ====================${NC}"
-    grep -v -e "DESKTOP_USER" "${STATE_FILE}" | sed 's/^/  /'
-    echo -e "\n${CYAN}---     应用数据目录     ---${NC}"
+    
+    # 查找所有凭证并显示
+    local credentials_content=$(grep -v -e "DESKTOP_USER" "${STATE_FILE}")
+    echo "${credentials_content}" | while IFS= read -r line; do
+        if [[ "$line" == *"Nextcloud 套件凭证"* ]]; then
+            echo -e "${CYAN}--- Nextcloud 安装所需信息 ---${NC}"
+            echo "  ${line}" # 显示原始的凭证标题行
+            
+            # 显示 Nextcloud 相关的详细数据库信息
+            local db_password=$(echo "${credentials_content}" | grep 'DB_PASSWORD' | cut -d'=' -f2)
+            echo "       数据库用户    : nextclouduser"
+            echo "       数据库密码    : ${db_password}"
+            echo "       数据库名      : nextclouddb"
+            echo "       数据库主机    : nextcloud_db"
+            
+            # 显示其他 Nextcloud 相关凭证，排除已手动显示的密码
+            echo "${credentials_content}" | grep -E "NEXTCLOUD_DOMAIN|ONLYOFFICE_DOMAIN|ONLYOFFICE_JWT_SECRET" | sed 's/^/  /'
+            echo ""
+
+        elif [[ "$line" == *"WordPress 凭证"* || "$line" == *"AI 核心凭证"* || "$line" == *"JDownloader"* ]]; then
+             # 对于其他带标题的凭证，正常显示
+             echo -e "${CYAN}--- $(echo $line | sed 's/##//; s/(.*)//' | xargs) ---${NC}"
+             echo "${credentials_content}" | grep -A1 "$line" | grep -v "$line" | sed 's/^/  /'
+             echo ""
+        fi
+    done
+    
+    echo -e "${CYAN}---     应用数据目录     ---${NC}"
     [ -d "/mnt/Music" ] && echo "  🎵 音乐库 (Navidrome/Jellyfin): /mnt/Music"
     [ -d "/mnt/Movies" ] && echo "  🎬 电影库 (Jellyfin): /mnt/Movies"
     [ -d "/mnt/TVShows" ] && echo "  📺 电视剧库 (Jellyfin): /mnt/TVShows"
     [ -d "/mnt/Downloads" ] && echo "  🔽 默认下载目录: /mnt/Downloads"
-    if grep -q "RCLONE_MOUNT_PATH" "${STATE_FILE}"; then echo "  ☁️ Rclone 网盘挂载点: $(grep 'RCLONE_MOUNT_PATH' ${STATE_FILE} | cut -d'=' -f2)"; fi
-    echo -e "${RED}==================================================================${NC}"
+    if grep -q "RCLONE_MOUNT_PATH" "${STATE_FILE}"; then
+        echo "  ☁️ Rclone 网盘挂载点: $(grep 'RCLONE_MOUNT_PATH' ${STATE_FILE} | cut -d'=' -f2)"
+    fi
+
+    echo -e "${RED}================================================================================${NC}"
     read -n 1 -s -r -p "按任意键返回主菜单..."
 }
 
