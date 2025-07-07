@@ -1179,6 +1179,8 @@ show_credentials() {
     echo -e "${RED}================================================================================${NC}"
     read -n 1 -s -r -p "按任意键返回主菜单..."
 }
+
+
 # 99. 一键还原毛坯
 uninstall_everything() {
     clear
@@ -1196,7 +1198,24 @@ uninstall_everything() {
     rm -- "$0"
     exit 0
 }
-
+# 26. 科学工具箱 - (v6.6.8 交互优化版)
+install_science_tools() {
+    clear
+    echo -e "${RED}--- “    科学    ”    工具箱     ---${NC}"
+    echo "1) Warp (by fscarmen)"; echo "2) ArgoX (by fscarmen)"; echo "3) OpenVPN (by Nyr)"; echo "b) 返回"
+    read -p "请输入您的选择: " science_choice
+    case $science_choice in
+        1) bash <(wget -qO- https://gitlab.com/fscarmen/warp/-/raw/main/menu.sh) ;;
+        2) bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/argox/main/argox.sh) ;;
+        3) wget https://git.io/vpn -O openvpn-install.sh && sudo bash openvpn-install.sh ;;
+        b) return ;; 
+        *) echo -e "${RED}无效选择!${NC}"; sleep 2; return;;
+    esac
+    
+    # 移除原有的read等待，改为短暂休眠后自动返回，避免交互冲突
+    echo -e "\n${GREEN}子程序操作完成，即将返回主菜单...${NC}"
+    sleep 2
+}
 
 # ---     主循环     ---
 while true; do
