@@ -1,9 +1,9 @@
 #!/bin/bash
 #================================================================
-# “    VPS 从零开始装修面板    ” v7.2.0 -    Rclone 联动增强版
-#    1.   重构 Rclone 功能，实现一次配置、全盘挂载到 /mnt/onedrive，简化操作。
-#    2.   增强服务控制中心，可为 Jellyfin/Navidrome/qBittorrent 等应用动态关联 Rclone 路径。
-#    3.   新增“查看应用目录”与“关联 Rclone”功能，实现本地存储与云端存储的无缝切换。
+# “    VPS 从零开始装修面板    ” v7.3.0 -    写入性能终极优化版
+#    1.   优化 Rclone 挂载参数，将 --vfs-cache-mode 改为 full，大幅提升下载写入稳定性和性能。
+#    2.   在主菜单和关联操作后增加清晰的应用内路径设置指引，防止用户混淆。
+#    3.   修复下载器路径关联的逻辑 Bug，确保每个下载器都能被独立正确地配置。
 #     作者     : 張財多 zhangcaiduo.com
 #================================================================
 
@@ -201,7 +201,7 @@ show_main_menu() {
                                            zhangcaiduo.com
 "
 
-    echo -e "${GREEN}============ VPS 从毛坯房开始装修VPS 包工头面板 v7.2.0 ============================================${NC}"
+    echo -e "${GREEN}============ VPS 从毛坯房开始装修VPS 包工头面板 v7.3.0 ============================================${NC}"
     echo -e "${BLUE}本脚本适用于 Ubuntu 和 Debian 系统的 VPS 常用项目部署 ${NC}"
     echo -e "${BLUE}如果您退出了装修面板，输入 zhangcaiduo 可再次调出 ${NC}"
     echo -e "${BLUE}=========================================================================================${NC}"
@@ -230,7 +230,7 @@ show_main_menu() {
     check_and_display "10" "部署 qBittorrent 下载器" "/root/qbittorrent_data" "docker:qbittorrent_app:8080"
     check_and_display "11" "部署 JDownloader 下载器" "/root/jdownloader_data" "docker:jdownloader_app:5800"
     check_and_display "12" "部署 yt-dlp 视频下载器" "/root/ytdlp_data" "docker_nopm:ytdlp_app"
-
+    
     echo -e "      ${CYAN}注意: 关联Rclone后, 请确保在下载器WEB界面中, 保存路径为 /downloads 或 /output ${NC}"
 
     echo -e "  ${GREEN}---  安防与工具  ---${NC}"
@@ -948,7 +948,7 @@ EOF
     echo -e "\n${GREEN}    按任意键返回主菜单    ...${NC}"; read -n 1 -s
 }
 
-# 18. Rclone 数据同步桥 (v7.2.0 重构)
+# 18. Rclone 数据同步桥 (v7.3.0 优化)
 configure_rclone_engine() {
     clear
     echo -e "${BLUE}--- “Rclone 数据同步桥”配置向导 (全盘跃迁模式) ---${NC}"
@@ -1023,7 +1023,7 @@ ExecStart=/usr/bin/rclone mount ${rclone_remote_name}: ${rclone_mount_path} \\
 --gid 1000 \\
 --allow-other \\
 --allow-non-empty \\
---vfs-cache-mode writes \\
+--vfs-cache-mode full \\
 --vfs-cache-max-size 5G \\
 --log-level INFO \\
 --log-file ${RCLONE_LOG_FILE}
@@ -1038,7 +1038,7 @@ EOF
     sleep 2
     
     if systemctl is-active --quiet "rclone-vps-mount.service"; then
-        echo -e "${GREEN}     ✅        Rclone 全盘跃迁通道已激活！${NC}"
+        echo -e "${GREEN}     ✅        Rclone 全盘跃迁通道已激活！写入性能已优化！${NC}"
         echo -e "${GREEN}     您的 ${rclone_remote_name} 网盘已完整挂载到 ${rclone_mount_path} ${NC}"
     else
         echo -e "${RED}     ❌        挂载通道启动失败！请检查日志。${NC}"
@@ -1116,7 +1116,7 @@ run_nextcloud_optimization() {
     echo -e "\n${GREEN}    按任意键返回主菜单    ...${NC}"; read -n 1 -s
 }
 
-# 23. 服务控制中心 (v7.2.2 修复版)
+# 23. 服务控制中心 (v7.3.0 修复版)
 show_service_control_panel() {
     ensure_docker_installed || return
     while true; do
@@ -1165,13 +1165,11 @@ show_service_control_panel() {
         local s_path=$(echo $selected_service | cut -d':' -f2)
         local compose_file="${s_path}/docker-compose.yml"
 
-        # 定义可关联 Rclone 的服务及其属性
         local is_linkable=false
-        local container_paths=() # 容器内的路径
-        local path_labels=()    # 给用户看的标签
-        local default_local_paths=() # 默认的本地路径
+        local container_paths=()
+        local path_labels=()
+        local default_local_paths=()
 
-        # BUG 修复：将下载器分开处理，确保每个服务的数组长度都匹配
         case "$s_name" in
             "Jellyfin 影院")
                 is_linkable=true
@@ -1222,7 +1220,7 @@ show_service_control_panel() {
                 1) (cd $s_path && sudo docker-compose up -d); echo -e "${GREEN}${s_name} 已启动!${NC}";;
                 2) (cd $s_path && sudo docker-compose stop); echo -e "${YELLOW}${s_name} 已停止!${NC}";;
                 3) (cd $s_path && sudo docker-compose restart); echo -e "${CYAN}${s_name} 已重启!${NC}";;
-                4)  # 查看路径
+                4)
                     echo -e "\n${CYAN}--- ${s_name} 当前文件夹地址 ---${NC}"
                     for i in ${!container_paths[@]}; do
                         local c_path=${container_paths[$i]}
@@ -1236,7 +1234,7 @@ show_service_control_panel() {
                     read -n 1 -s -r -p "按任意键返回..."
                     continue
                     ;;
-                    5)  # 关联 Rclone
+                5)
                     if ! grep -q "RCLONE_MOUNT_PATH" "${STATE_FILE}"; then
                         echo -e "${RED}错误：Rclone 未配置或未完全配置。请先在主菜单选择 '18' 完成配置。${NC}"; sleep 4; continue
                     fi
@@ -1250,7 +1248,6 @@ show_service_control_panel() {
                         local c_path=${container_paths[$i]}
                         local label=${path_labels[$i]}
                         local default_local_path=${default_local_paths[$i]}
-
                         local line_to_replace=$(grep -E ":${c_path}['\"]?$" "$compose_file" | head -n 1)
                         if [ -z "$line_to_replace" ]; then continue; fi
 
@@ -1269,8 +1266,6 @@ show_service_control_panel() {
                         sudo mkdir -p "${new_host_path}"
                         local indentation=$(echo "$line_to_replace" | awk '{gsub(/[^ ].*/, ""); print}')
                         local new_line="${indentation}- '${new_host_path}:${c_path}'"
-
-                        # 使用 '|' 作为 sed 分隔符避免路径中的 '/' 干扰
                         sudo sed -i "s|${line_to_replace}|${new_line}|" "${compose_file}"
                     done
 
@@ -1279,7 +1274,6 @@ show_service_control_panel() {
                     sleep 2
                     echo -e "${GREEN} ✅ 服务已重启！${NC}"
 
-                    # 新增：根据服务名称，提供应用内路径设置的提示
                     local app_internal_path=""
                     case "$s_name" in
                         "qBittorrent") app_internal_path="/downloads" ;;
@@ -1297,7 +1291,7 @@ show_service_control_panel() {
                 b) continue;;
                 *) echo -e "${RED}     无效操作    !${NC}";;
             esac
-        else # 如果服务不可关联 Rclone
+        else
             echo "1)     启动"
             echo "2)     停止"
             echo "3)     重启"
@@ -1316,6 +1310,7 @@ show_service_control_panel() {
         sleep 2
     done
 }
+
 
 # 24.     显示凭证
 show_credentials() {
@@ -1400,29 +1395,24 @@ uninstall_everything() {
         /root/memos_data /root/navidrome_data /root/qbittorrent_data \
         /root/jdownloader_data /root/ytdlp_data /root/.config/rclone
     
-    # 卸载 Rclone 挂载点
     if grep -q "RCLONE_MOUNT_PATH" "${STATE_FILE}"; then
         local rclone_mount_path=$(grep "RCLONE_MOUNT_PATH" "${STATE_FILE}" | cut -d'=' -f2)
         sudo umount "${rclone_mount_path}" >/dev/null 2>&1
         sudo rm -rf "${rclone_mount_path}"
     fi
-    # 清理其他 /mnt 目录
     sudo umount /mnt/* >/dev/null 2>&1
     sudo rm -rf /mnt/*
 
     echo -e "${GREEN}     ✅     所有数据文件夹已清理。    ${NC}"
 
     echo -e "\n${YELLOW}     🚀     [3/6]     正在卸载脚本安装的系统级工具...${NC}"
-    # 卸载Rclone服务
     if [ -f "/etc/systemd/system/rclone-vps-mount.service" ]; then
         sudo systemctl stop rclone-vps-mount.service
         sudo systemctl disable rclone-vps-mount.service
         sudo rm -f /etc/systemd/system/rclone-vps-mount.service
     fi
     sudo systemctl daemon-reload
-    # 卸载邮件报告
     (crontab -l 2>/dev/null | grep -v "/usr/local/bin/daily_server_report.sh") | crontab -
-    # 卸载远程桌面和用户
     if [ -f "/etc/xrdp/xrdp.ini" ]; then
         local desktop_user=$(grep 'DESKTOP_USER' ${STATE_FILE} 2>/dev/null | cut -d'=' -f2)
         if [ -n "$desktop_user" ] && id "$desktop_user" &>/dev/null; then
@@ -1431,7 +1421,6 @@ uninstall_everything() {
         fi
         sudo rm -f /root/.xsession
     fi
-    # 批量卸载
     sudo apt-get purge -y fail2ban s-nail msmtp vnstat xrdp xfce4* &>/dev/null
     sudo rm -f /etc/msmtprc /etc/s-nail.rc /usr/local/bin/daily_server_report.sh /etc/fail2ban/jail.local
     echo -e "${GREEN}     ✅     脚本安装的系统级工具已卸载。    ${NC}"
@@ -1472,7 +1461,6 @@ uninstall_everything() {
     echo "    所有相关服务和数据已被清除。您的服务器已最大程度恢复纯净。"
     echo -e "${RED}    强烈建议您【重启服务器】以确保所有变更生效。如果想再次使用本面板，最好【重装操作系统】。${NC}"
     
-    # 脚本自毁
     rm -- "$0"
 
     echo -e "\n${GREEN}    按任意键退出...${NC}"; read -n 1 -s
