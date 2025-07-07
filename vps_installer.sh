@@ -1114,7 +1114,7 @@ run_nextcloud_optimization() {
     echo -e "\n${GREEN}    按任意键返回主菜单    ...${NC}"; read -n 1 -s
 }
 
-# 23. 服务控制中心 (v7.2.0 重构)
+# 23. 服务控制中心 (v7.2.2 修复版)
 show_service_control_panel() {
     ensure_docker_installed || return
     while true; do
@@ -1124,9 +1124,9 @@ show_service_control_panel() {
 
         declare -a services=(
             "Nextcloud 数据中心:/root/nextcloud_data" "网络水电总管 (NPM):/root/npm_data" "OnlyOffice 办公室:/root/onlyoffice_data"
-            "WordPress 博客:/root/wordpress_data" "AI 大脑:/root/ai_stack" "Jellyfin 影院:/root/jellyfin_data" 
-            "Navidrome 音乐:/root/navidrome_data" "Alist 网盘:/root/alist_data" "Gitea 仓库:/root/gitea_data" 
-            "Memos 笔记:/root/memos_data" "qBittorrent:/root/qbittorrent_data" "JDownloader:/root/jdownloader_data" 
+            "WordPress 博客:/root/wordpress_data" "AI 大脑:/root/ai_stack" "Jellyfin 影院:/root/jellyfin_data"
+            "Navidrome 音乐:/root/navidrome_data" "Alist 网盘:/root/alist_data" "Gitea 仓库:/root/gitea_data"
+            "Memos 笔记:/root/memos_data" "qBittorrent:/root/qbittorrent_data" "JDownloader:/root/jdownloader_data"
             "yt-dlp 下载:/root/ytdlp_data"
         )
 
@@ -1157,18 +1157,19 @@ show_service_control_panel() {
         if ! [[ $index -ge 0 && $index -lt ${#active_services[@]} ]]; then
              echo -e "${RED}     无效选择    !${NC}"; sleep 2; continue
         fi
-        
+
         local selected_service=${active_services[$index]}
         local s_name=$(echo $selected_service | cut -d':' -f1)
         local s_path=$(echo $selected_service | cut -d':' -f2)
         local compose_file="${s_path}/docker-compose.yml"
-        
+
         # 定义可关联 Rclone 的服务及其属性
         local is_linkable=false
         local container_paths=() # 容器内的路径
         local path_labels=()    # 给用户看的标签
         local default_local_paths=() # 默认的本地路径
 
+        # BUG 修复：将下载器分开处理，确保每个服务的数组长度都匹配
         case "$s_name" in
             "Jellyfin 影院")
                 is_linkable=true
@@ -1182,9 +1183,21 @@ show_service_control_panel() {
                 path_labels=("音乐库")
                 default_local_paths=("/mnt/Music")
                 ;;
-            "qBittorrent"|"JDownloader"|"yt-dlp 下载")
+            "qBittorrent")
                 is_linkable=true
-                container_paths=("/downloads" "/output" "/app/downloads") # 这三个容器路径不同但都指向下载目录
+                container_paths=("/downloads")
+                path_labels=("下载目录")
+                default_local_paths=("/mnt/Downloads")
+                ;;
+            "JDownloader")
+                is_linkable=true
+                container_paths=("/output")
+                path_labels=("下载目录")
+                default_local_paths=("/mnt/Downloads")
+                ;;
+            "yt-dlp 下载")
+                is_linkable=true
+                container_paths=("/app/downloads")
                 path_labels=("下载目录")
                 default_local_paths=("/mnt/Downloads")
                 ;;
@@ -1192,7 +1205,7 @@ show_service_control_panel() {
 
         clear
         echo "    正在操作服务    : ${CYAN}${s_name}${NC}"
-        
+
         if $is_linkable; then
             echo "1)     启动"
             echo "2)     停止"
@@ -1212,8 +1225,7 @@ show_service_control_panel() {
                     for i in ${!container_paths[@]}; do
                         local c_path=${container_paths[$i]}
                         local label=${path_labels[$i]}
-                        # 查找所有可能的路径定义，适配不同的服务
-                        local line=$(grep -E ":${c_path}['\"]?$" "$compose_file" || grep -E ":/downloads['\"]?$" "$compose_file" || grep -E ":/output['\"]?$" "$compose_file")
+                        local line=$(grep -E ":${c_path}['\"]?$" "$compose_file" | head -n 1)
                         if [ -n "$line" ]; then
                            local host_path=$(echo "$line" | awk -F: '{print $1}' | sed -e 's/^[ \t-]*//' -e "s/['\"]//g")
                            echo "  - ${label}: ${GREEN}${host_path}${NC}"
@@ -1230,22 +1242,19 @@ show_service_control_panel() {
                     if ! mount | grep -q "${rclone_mount_path}"; then
                          echo -e "${RED}错误：Rclone 挂载点 ${rclone_mount_path} 未生效。请检查服务状态。${NC}"; sleep 4; continue
                     fi
-                    
+
                     echo -e "\n${CYAN}--- 关联 Rclone 网盘文件夹 ---${NC}"
                     for i in ${!container_paths[@]}; do
                         local c_path=${container_paths[$i]}
                         local label=${path_labels[$i]}
                         local default_local_path=${default_local_paths[$i]}
 
-                        # 查找当前行
-                        local line_to_replace=$(grep -E ":${c_path}['\"]?$" "$compose_file" || grep -E ":/downloads['\"]?$" "$compose_file" || grep -E ":/output['\"]?$" "$compose_file" | head -n 1)
+                        local line_to_replace=$(grep -E ":${c_path}['\"]?$" "$compose_file" | head -n 1)
                         if [ -z "$line_to_replace" ]; then continue; fi
 
-                        local current_host_path=$(echo "$line_to_replace" | awk -F: '{print $1}' | sed -e 's/^[ \t-]*//' -e "s/['\"]//g")
-                        
-                        echo -e "${YELLOW}(留空则恢复默认VPS的 ${default_local_path} 文件夹，直接输入如“Music”则关联到你的网盘文件夹名)${NC}"
+                        echo -e "${YELLOW}(留空则恢复默认VPS的 ${default_local_path} 文件夹，输入如“Music”这样的网盘文件夹名)${NC}"
                         read -p "请输入用于[${label}]的网盘文件夹名 : " rclone_subfolder
-                        
+
                         local new_host_path=""
                         if [ -z "$rclone_subfolder" ]; then
                            new_host_path=$default_local_path
