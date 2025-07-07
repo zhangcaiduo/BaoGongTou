@@ -1243,7 +1243,7 @@ show_service_control_panel() {
 
                         local current_host_path=$(echo "$line_to_replace" | awk -F: '{print $1}' | sed -e 's/^[ \t-]*//' -e "s/['\"]//g")
                         
-                        echo -e "${YELLOW}(留空则恢复默认VPS的 ${default_local_path} 文件夹，输入如“Music”这样的网盘文件夹名)${NC}"
+                        echo -e "${YELLOW}(留空则恢复默认VPS的 ${default_local_path} 文件夹，直接输入如“Music”则关联到你的网盘文件夹名)${NC}"
                         read -p "请输入用于[${label}]的网盘文件夹名 : " rclone_subfolder
                         
                         local new_host_path=""
