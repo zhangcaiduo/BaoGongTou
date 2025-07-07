@@ -197,6 +197,40 @@ show_vps_status() {
     htop
 }
 
+# --- 新增：一键深度清理函数 ---
+system_cleanup() {
+    clear
+    echo -e "${BLUE}--- 深度清理与系统优化 ---${NC}"
+    echo -e "${YELLOW}即将开始一套大扫除，让您的小鸡恢复丝般顺滑...${NC}"
+    sleep 3
+
+    echo -e "\n${CYAN}🧹 [1/4] 正在清扫系统更新缓存...${NC}"
+    sudo apt-get clean
+    sudo apt-get autoremove -y > /dev/null 2>&1
+    echo -e "${GREEN}✅ 系统更新缓存已清理！${NC}"
+    sleep 1
+
+    echo -e "\n${CYAN}📦 [2/4] 正在清理 Docker 环境 (已停止的容器、无用网络和镜像)...${NC}"
+    docker system prune -f
+    echo -e "${GREEN}✅ Docker 环境已瘦身！${NC}"
+    sleep 1
+
+    echo -e "\n${CYAN}📜 [3/4] 正在压缩系统日志文件...${NC}"
+    sudo journalctl --vacuum-size=50M > /dev/null 2>&1
+    echo -e "${GREEN}✅ 系统日志已优化！${NC}"
+    sleep 1
+
+    echo -e "\n${CYAN}💧 [4/4] 正在释放内存缓存...${NC}"
+    sudo sync && sudo sh -c 'echo 3 > /proc/sys/vm/drop_caches'
+    echo -e "${GREEN}✅ 内存缓存已释放！${NC}"
+    sleep 1
+    
+    echo -e "\n${GREEN}✨ 系统深度清理完成！您的小鸡现在感觉身轻如燕，丝般顺滑！${NC}"
+    echo -e "${YELLOW}当前内存状态：${NC}"
+    free -h
+
+    echo -e "\n${GREEN}按任意键返回主菜单 ...${NC}"; read -n 1 -s
+}
 
 show_main_menu() {
     clear
@@ -209,7 +243,6 @@ show_main_menu() {
    ╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═══╝ ╚═════╝  ╚═════╝╚═╝  ╚═╝╚═╝╚═════╝  ╚═════╝  ╚═════╝ 
                                            zhangcaiduo.com
 "
-    # --- 新布局 ---
     echo -e "${GREEN}============ VPS 从毛坯房开始装修VPS 包工头面板 v6.6.6 ============================================${NC}"
     echo -e "${BLUE}本脚本适用于 Ubuntu 和 Debian 系统的 VPS 常用项目部署 ${NC}"
     echo -e "${BLUE}如果您退出了装修面板，输入 zhangcaiduo 可再次调出 ${NC}"
@@ -262,12 +295,12 @@ show_main_menu() {
     printf "  %-58s\t%s\n" "26) 打开“科学上网”工具箱" "[ Warp, Argo, OpenVPN ]"
     echo -e "${GREEN}===================================================================================================${NC}"
     echo ""
+    printf "  %-58s\t%s\n" "X)  一键深度清理 (清理垃圾与缓存)" "[ ${CYAN}让小鸡更丝滑${NC} ]"
     printf "  %-58s\t%s\n" "99) ${RED}一键辞退包工头${NC}" "[ ${RED}注：此选项将会拆卸本脚本！！！${NC} ]"
     printf "  %-58s\n" "q)  退出面板"
     echo ""
     echo -e "${GREEN}===================================================================================================${NC}"
 }
-
 
 # ---     所有功能的函数定义（保持不变，此处省略以节省篇幅）---
 # ... (从 # --- 前置检查 --- 到 # --- 主循环 --- 之前的所有函数都应原样复制到这里) ...
@@ -1174,7 +1207,7 @@ uninstall_everything() {
 # ---     主循环     ---
 while true; do
     show_main_menu
-    read -p "    请输入您的选择 (u, m, s, 1-26, 99, q): " choice
+    read -p "    请输入您的选择 (u, m, s, 1-26, X, 99, q): " choice
 
     case $choice in
         u|U) update_system ;;
@@ -1202,6 +1235,7 @@ while true; do
         24) show_credentials ;;
         25) show_vps_status ;;
         26) install_science_tools ;;
+        x|X) system_cleanup ;;
         99) uninstall_everything ;;
         q|Q) echo -e "${BLUE}    装修愉快，房主再见！    ${NC}"; exit 0 ;;
         *) echo -e "${RED}    无效的选项，请重新输入。    ${NC}"; sleep 2 ;;
