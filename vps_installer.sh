@@ -1180,24 +1180,6 @@ show_credentials() {
     read -n 1 -s -r -p "按任意键返回主菜单..."
 }
 
-
-# 99. 一键还原毛坯
-uninstall_everything() {
-    clear
-    read -p "为确认执行此终极毁灭操作，请输入【yEs-i-aM-sUrE】: " confirmation
-    if [[ "$confirmation" != "yEs-i-aM-sUrE" ]]; then echo -e "${GREEN}操作已取消。${NC}"; sleep 3; return; fi
-    if command -v docker &> /dev/null; then sudo docker system prune -a --volumes -f; fi
-    if grep -q "RCLONE_MOUNT_PATH" "${STATE_FILE}"; then local rclone_mount_path=$(grep "RCLONE_MOUNT_PATH" "${STATE_FILE}" | cut -d'=' -f2); sudo umount "${rclone_mount_path}" >/dev/null 2>&1; fi
-    sudo rm -rf /root/{npm,nextcloud,onlyoffice,wordpress,jellyfin,ai_stack,alist,gitea,memos,navidrome,qbittorrent,jdownloader,ytdlp}_data /root/.config/rclone /mnt/*
-    if [ -f "/etc/systemd/system/rclone-vps-mount.service" ]; then sudo systemctl stop rclone-vps-mount.service; sudo systemctl disable rclone-vps-mount.service; sudo rm -f /etc/systemd/system/rclone-vps-mount.service; fi
-    (crontab -l 2>/dev/null | grep -v "/usr/local/bin/daily_server_report.sh") | crontab -
-    if [ -f "/etc/xrdp/xrdp.ini" ]; then local desktop_user=$(grep 'DESKTOP_USER' ${STATE_FILE} 2>/dev/null | cut -d'=' -f2); if [ -n "$desktop_user" ] && id "$desktop_user" &>/dev/null; then sudo deluser --remove-home "$desktop_user" &>/dev/null; fi; sudo rm -f /root/.xsession; fi
-    sudo apt-get purge -y fail2ban s-nail msmtp vnstat xrdp xfce4* &>/dev/null; sudo apt-get autoremove -y &>/dev/null
-    sudo rm -f /etc/msmtprc /etc/s-nail.rc /usr/local/bin/daily_server_report.sh /etc/fail2ban/jail.local ${STATE_FILE} ${RCLONE_LOG_FILE} /usr/local/bin/zhangcaiduo
-    echo -e "\n${GREEN} ✅ 终极还原完成。建议重启服务器。${NC}"
-    rm -- "$0"
-    exit 0
-}
 # 26. 科学工具箱 - (v6.6.8 交互优化版)
 install_science_tools() {
     clear
@@ -1215,6 +1197,24 @@ install_science_tools() {
     # 移除原有的read等待，改为短暂休眠后自动返回，避免交互冲突
     echo -e "\n${GREEN}子程序操作完成，即将返回主菜单...${NC}"
     sleep 2
+}
+
+# 99. 一键还原毛坯
+uninstall_everything() {
+    clear
+    read -p "为确认执行此终极毁灭操作，请输入【yEs-i-aM-sUrE】: " confirmation
+    if [[ "$confirmation" != "yEs-i-aM-sUrE" ]]; then echo -e "${GREEN}操作已取消。${NC}"; sleep 3; return; fi
+    if command -v docker &> /dev/null; then sudo docker system prune -a --volumes -f; fi
+    if grep -q "RCLONE_MOUNT_PATH" "${STATE_FILE}"; then local rclone_mount_path=$(grep "RCLONE_MOUNT_PATH" "${STATE_FILE}" | cut -d'=' -f2); sudo umount "${rclone_mount_path}" >/dev/null 2>&1; fi
+    sudo rm -rf /root/{npm,nextcloud,onlyoffice,wordpress,jellyfin,ai_stack,alist,gitea,memos,navidrome,qbittorrent,jdownloader,ytdlp}_data /root/.config/rclone /mnt/*
+    if [ -f "/etc/systemd/system/rclone-vps-mount.service" ]; then sudo systemctl stop rclone-vps-mount.service; sudo systemctl disable rclone-vps-mount.service; sudo rm -f /etc/systemd/system/rclone-vps-mount.service; fi
+    (crontab -l 2>/dev/null | grep -v "/usr/local/bin/daily_server_report.sh") | crontab -
+    if [ -f "/etc/xrdp/xrdp.ini" ]; then local desktop_user=$(grep 'DESKTOP_USER' ${STATE_FILE} 2>/dev/null | cut -d'=' -f2); if [ -n "$desktop_user" ] && id "$desktop_user" &>/dev/null; then sudo deluser --remove-home "$desktop_user" &>/dev/null; fi; sudo rm -f /root/.xsession; fi
+    sudo apt-get purge -y fail2ban s-nail msmtp vnstat xrdp xfce4* &>/dev/null; sudo apt-get autoremove -y &>/dev/null
+    sudo rm -f /etc/msmtprc /etc/s-nail.rc /usr/local/bin/daily_server_report.sh /etc/fail2ban/jail.local ${STATE_FILE} ${RCLONE_LOG_FILE} /usr/local/bin/zhangcaiduo
+    echo -e "\n${GREEN} ✅ 终极还原完成。建议重启服务器。${NC}"
+    rm -- "$0"
+    exit 0
 }
 
 # ---     主循环     ---
