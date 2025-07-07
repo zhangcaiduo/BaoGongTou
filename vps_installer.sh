@@ -1281,9 +1281,12 @@ show_service_control_panel() {
                         "yt-dlp 下载") app_internal_path="/app/downloads" ;;
                     esac
 
-                    if [ -n "$app_internal_path" ]; then
+                        if [ -n "$app_internal_path" ]; then
                         echo -e "\n${YELLOW}🔔 温馨提示：关联已成功！这只是第一步。${NC}"
                         echo -e "${YELLOW}   您还需要在【${s_name}的Web界面】里，将文件的【保存路径】或【下载目录】设置为 ${GREEN}${app_internal_path}${NC}"
+                        if [[ "$s_name" == "qBittorrent" ]]; then
+                            echo -e "${YELLOW}   ${RED}特别注意：请务必在qBittorrent的 设置->下载 中，【取消勾选“为所有文件预分配磁盘空间”】！${NC}"
+                        fi
                         echo -e "${YELLOW}   这样，新任务才会默认保存到您刚刚关联的Rclone网盘文件夹中！${NC}"
                     fi
                     ;;
