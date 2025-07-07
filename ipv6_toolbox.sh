@@ -1,11 +1,11 @@
 #!/bin/bash
 
 # ================================================================= #
-#                 Euserv (德鸡) 终极工具箱 v2.4 (最终版)            #
+#                 IPv6 / Euserv (德鸡) 终极工具箱 v2.5              #
 #                                                                 #
 #               总设计师: Gemini & 首席指挥官: 張財多             #
 #                                                                 #
-#   更新: 安装 Navidrome 后增加明确的音乐上传路径指引。            #
+#   更新: 新增返回“VPS包工头”主面板的功能，实现完美闭环。          #
 # ================================================================= #
 
 # --- 颜色定义 ---
@@ -374,10 +374,9 @@ show_menu() {
     ╚═╝╚═╝       ╚═══╝   ╚═════╝       ╚═══╝  ╚═╝     ╚══════╝
 
 EOT
-    echo -e "${GREEN}============ VPS 从毛坯房开始装修VPS 包工头面板 v6.6.6 ============================================${NC}"
-    echo -e "${BLUE}本脚本是包工头面板的子选项，适用于各种 IPV6 免费小鸡的常用项目部署 ${NC}"
-    echo -e "${BLUE}如果您退出了装修面板，输入 zhangcaiduo 可再次调出 ${NC}"
-    echo -e "${BLUE}本脚本是小白学习的总结，不做任何商业用途和盈利，感谢 Gemini 地球之神的全局帮助。${NC}"
+    echo -e "${GREEN}============ IPv6 专用工具箱 (Euserv/Hax/Oracle Free Tier) ========================================${NC}"
+    echo -e "${BLUE}本脚本是“VPS包工头”的子面板，专为各类免费IPv6小鸡优化。${NC}"
+    echo -e "${BLUE}全局帮助: Gemini 地球之神 | 项目作者: 張財多 (zhangcaiduo.com)${NC}"
     echo -e "${GREEN}===================================================================================================${NC}"
 
     echo -e "${YELLOW}请选择要执行的操作:${NC}"
@@ -399,14 +398,15 @@ EOT
     echo -e "     ${BLUE}(免责声明: 感谢 fscarmen。本功能仅供学习，请遵守当地法律法规)${NC}"
 
     echo -e ""
+    echo -e "  ${BLUE}8) 返回【VPS 包工头】主面板${NC}"
     echo -e "  ${RED}0) 退出脚本${NC}"
-    echo -e "${GREEN}====================================================================${NC}"
+    echo -e "${GREEN}===================================================================================================${NC}"
 }
 
 # --- 主循环 ---
 while true; do
     show_menu
-    read -p "请输入选项 [0-7]: " choice
+    read -p "请输入选项 [0-8]: " choice
 
     case $choice in
         1) if ! is_nginx_installed; then apt-get update && apt-get install -y nginx certbot python3-certbot-nginx; fi; install_nginx_manager ;;
@@ -416,8 +416,16 @@ while true; do
         5) if is_fail2ban_installed; then read -p "确定卸载？[y/N]: " c && [[ $c == [yY] ]] && uninstall_fail2ban; else install_fail2ban; fi ;;
         6) install_warp ;;
         7) install_argo ;;
-        0) echo -e "${BLUE}感谢使用！指挥官再见！${NC}"; exit 0 ;;
-        *) echo -e "${RED}无效输入...${NC}" ;;
+        8)
+            bash <(wget -qO- https://raw.githubusercontent.com/zhangcaiduo/BaoGongTou/main/vps_installer.sh)
+            exit 0
+            ;;
+        0) 
+            echo -e "${BLUE}感谢使用！指挥官再见！${NC}"; exit 0 
+            ;;
+        *) 
+            echo -e "${RED}无效输入...${NC}" 
+            ;;
     esac
     echo ""; read -p "按 [Enter] 键返回主菜单..."
 done
